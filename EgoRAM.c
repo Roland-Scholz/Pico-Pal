@@ -58,7 +58,7 @@ static uint8_t *char_font = (uint8_t *)vt100_font_8x8;
 static uint32_t mode;
 
 static volatile uint8_t *video_ram;
-static volatile uint8_t *char_ram;
+// static volatile uint8_t *char_ram;
 static volatile uint8_t *cart_d5xx;
 static volatile uint32_t ticks;
 static bool uart_init_once;
@@ -77,6 +77,12 @@ static uint16_t ego_blitheight;
 static uint16_t ego_line_ptr[256];
 static uint16_t ego_addr;
 static uint16_t ego_len;
+static uint16_t ego_src_ptr;
+static uint16_t ego_dst_ptr;
+static uint16_t ego_src_inc;
+static uint16_t ego_dst_inc;
+static uint16_t ego_chr2fgx_width;
+static uint16_t ego_chr2fgx_height;
 
 static shape_t shape_array[EGO_MAX_SHAPES];
 static sprite_t sprite_array[EGO_MAX_SPRITES];
@@ -361,6 +367,35 @@ void do_movement()
     cart_d5xx[EGO_REG_STATUS] &= ~0x80;
 }
 
+void __not_in_flash_func(char_to_video)()
+{
+    int i, x, y;
+    int vypos;
+    uint16_t src_pos;
+    uint16_t dst_pos;
+    uint16_t c;
+
+    src_pos = ego_src_ptr & 0x3fff;
+    dst_pos = ego_dst_ptr & 0x3fff;
+
+    // ego_log("char2gfx src:%04X, inc:%04X, dst:%04X, inc:%04X, width:%02X, heigth:%02X, charset:%02X\n", src_pos, ego_src_inc, dst_pos, ego_dst_inc, ego_chr2fgx_width, ego_chr2fgx_height, ego_charset_no);
+
+    for (y = 0; y < ego_chr2fgx_height; y++)
+    {
+        for (x = 0; x < ego_chr2fgx_width; x++)
+        {
+            c = video_ram[src_pos + x] << 3;
+
+            for (i = 0; i < 8; i++)
+            {
+                video_ram[dst_pos + i * ego_dst_inc + x] = charset_array[ego_charset_no][c + i];
+            }
+        }
+        src_pos += ego_src_inc;
+        dst_pos += (ego_dst_inc << 3);
+    }
+}
+
 void __not_in_flash_func(do_data)(uint8_t data)
 {
     int i;
@@ -524,30 +559,53 @@ void __not_in_flash_func(do_data)(uint8_t data)
             ego_log("charset %d loaded\n", ego_charset_no);
         }
         break;
+    case EGO_ST_CHR2GFX_SRC_LO:
+        ego_src_ptr = data;
+        ego_state = EGO_ST_CHR2GFX_SRC_HI;
+        break;
+    case EGO_ST_CHR2GFX_SRC_HI:
+        ego_src_ptr |= data << 8;
+        ego_state = EGO_ST_CHR2GFX_SRC_INC_LO;
+        break;
+    case EGO_ST_CHR2GFX_SRC_INC_LO:
+        ego_src_inc = data;
+        ego_state = EGO_ST_CHR2GFX_SRC_INC_HI;
+        break;
+    case EGO_ST_CHR2GFX_SRC_INC_HI:
+        ego_src_inc |= data << 8;
+        ego_state = EGO_ST_CHR2GFX_DST_LO;
+        break;
+    case EGO_ST_CHR2GFX_DST_LO:
+        ego_dst_ptr = data;
+        ego_state = EGO_ST_CHR2GFX_DST_HI;
+        break;
+    case EGO_ST_CHR2GFX_DST_HI:
+        ego_dst_ptr |= data << 8;
+        ego_state = EGO_ST_CHR2GFX_DST_INC_LO;
+        break;
+    case EGO_ST_CHR2GFX_DST_INC_LO:
+        ego_dst_inc = data;
+        ego_state = EGO_ST_CHR2GFX_DST_INC_HI;
+        break;
+    case EGO_ST_CHR2GFX_DST_INC_HI:
+        ego_dst_inc |= data << 8;
+        ego_state = EGO_ST_CHR2GFX_WIDTH;
+        break;
+    case EGO_ST_CHR2GFX_WIDTH:
+        ego_chr2fgx_width = data;
+        ego_state = EGO_ST_CHR2GFX_HEIGHT;
+        break;
+    case EGO_ST_CHR2GFX_HEIGHT:
+        ego_chr2fgx_height = data;
+        ego_state = EGO_ST_CHR2GFX_CHARSET_NO;
+        break;
+    case EGO_ST_CHR2GFX_CHARSET_NO:
+        ego_charset_no = data & 0x01;
+        ego_state = EGO_ST_IDLE;
+        char_to_video();
+        break;
     default:
         break;
-    }
-}
-
-void __not_in_flash_func(char_to_video)()
-{
-    int i, x, y;
-    int ypos, vypos;
-    uint16_t c;
-
-    for (y = 0; y < 25; y++)
-    {
-        ypos = y * 40;
-        for (x = 0; x < 40; x++)
-        {
-            c = char_ram[ypos + x] << 3;
-
-            for (i = 0; i < 8; i++)
-            {
-                vypos = ego_line_ptr[(y << 3) + i];
-                video_ram[vypos + x] = charset_array[0][c + i];
-            }
-        }
     }
 }
 
@@ -615,7 +673,7 @@ void __not_in_flash_func(do_command)(uint8_t data)
         ego_state = EGO_ST_CHARSET_NO;
         break;
     case EGO_CMD_CHAR_TO_VIDEO:
-        char_to_video();
+        ego_state = EGO_ST_CHR2GFX_SRC_LO;
         break;
     case EGO_CMD_MOVEMENT:
         do_movement();
@@ -909,14 +967,14 @@ int main()
 
     while (to_ms_since_boot(get_absolute_time()) < 100)
     {
-        if (gpio_get(ATARI_PHI2_PIN))
+        if (!gpio_get(ATARI_PHI2_PIN))
         {
             mode = EGO_MODE_ATARI;
         }
     }
 
     video_ram = get_cart_ram();
-    char_ram = video_ram + 0x3C00;
+    //   char_ram = video_ram + 0x3800;
     cart_d5xx = get_cart_d5xx();
 
     // memset((void *)video_ram, 0x01, 4 * 1024);

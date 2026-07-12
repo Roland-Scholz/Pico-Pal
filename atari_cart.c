@@ -59,7 +59,7 @@
 
 static volatile unsigned char cart_ram[16 * 1024];
 static volatile unsigned char cart_d5xx[256];
-static volatile bool writeable = false;
+static volatile bool writeable = true;
 
 volatile unsigned char *__not_in_flash_func(get_cart_d5xx)()
 {

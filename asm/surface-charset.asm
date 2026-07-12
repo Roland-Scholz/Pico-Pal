@@ -1,4 +1,4 @@
-*=$5C00
+;*=$5C00
 ; When the game starts LaunchUridium copies this data to $D400. At the start of each level
 ; levelSurfaceDataHiPtrArray is used to write to pull the appropriate
 ; charset data for the level from this to surfaceTextureCharacterSet($7800).
