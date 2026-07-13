@@ -81,8 +81,10 @@ static uint16_t ego_src_ptr;
 static uint16_t ego_dst_ptr;
 static uint16_t ego_src_inc;
 static uint16_t ego_dst_inc;
-static uint16_t ego_chr2fgx_width;
-static uint16_t ego_chr2fgx_height;
+static uint8_t ego_chr2gfx_width;
+static uint8_t ego_chr2gfx_height;
+static uint8_t ego_chr2gfx_scroll;
+static uint8_t ego_chr2gfx_col38;
 
 static shape_t shape_array[EGO_MAX_SHAPES];
 static sprite_t sprite_array[EGO_MAX_SPRITES];
@@ -371,24 +373,31 @@ void __not_in_flash_func(char_to_video)()
 {
     int i, x, y;
     int vypos;
+    int line;
     uint16_t src_pos;
     uint16_t dst_pos;
-    uint16_t c;
+    uint8_t b, c;
 
     src_pos = ego_src_ptr & 0x3fff;
     dst_pos = ego_dst_ptr & 0x3fff;
 
-    // ego_log("char2gfx src:%04X, inc:%04X, dst:%04X, inc:%04X, width:%02X, heigth:%02X, charset:%02X\n", src_pos, ego_src_inc, dst_pos, ego_dst_inc, ego_chr2fgx_width, ego_chr2fgx_height, ego_charset_no);
+    // ego_log("char2gfx src:%04X, inc:%04X, dst:%04X, inc:%04X, width:%02X, heigth:%02X, charset:%02X, scroll:%02X\n", src_pos, ego_src_inc, dst_pos, ego_dst_inc, ego_chr2gfx_width, ego_chr2gfx_height, ego_charset_no, ego_chr2gfx_scroll);
 
-    for (y = 0; y < ego_chr2fgx_height; y++)
+    for (y = 0; y < ego_chr2gfx_height; y++)
     {
-        for (x = 0; x < ego_chr2fgx_width; x++)
+        for (line = 0; line < 8; line++)
         {
-            c = video_ram[src_pos + x] << 3;
-
-            for (i = 0; i < 8; i++)
+            b = 0;
+            for (x = 0; x < ego_chr2gfx_width; x++)
             {
-                video_ram[dst_pos + i * ego_dst_inc + x] = charset_array[ego_charset_no][c + i];
+                c = charset_array[ego_charset_no][(video_ram[src_pos + x] << 3) + line];
+                if (ego_chr2gfx_col38 != 0 & (x == 0 || x == 39))
+                    b = 0;
+                else
+                    b |= (c >> ego_chr2gfx_scroll);
+
+                video_ram[dst_pos + line * ego_dst_inc + x] = b;
+                b = c << (8 - ego_chr2gfx_scroll);
             }
         }
         src_pos += ego_src_inc;
@@ -592,15 +601,23 @@ void __not_in_flash_func(do_data)(uint8_t data)
         ego_state = EGO_ST_CHR2GFX_WIDTH;
         break;
     case EGO_ST_CHR2GFX_WIDTH:
-        ego_chr2fgx_width = data;
+        ego_chr2gfx_width = data;
         ego_state = EGO_ST_CHR2GFX_HEIGHT;
         break;
     case EGO_ST_CHR2GFX_HEIGHT:
-        ego_chr2fgx_height = data;
+        ego_chr2gfx_height = data;
         ego_state = EGO_ST_CHR2GFX_CHARSET_NO;
         break;
     case EGO_ST_CHR2GFX_CHARSET_NO:
         ego_charset_no = data & 0x01;
+        ego_state = EGO_ST_CHR2GFX_SCROLL;
+        break;
+    case EGO_ST_CHR2GFX_SCROLL:
+        ego_chr2gfx_scroll = data & 0x07;
+        ego_state = EGO_ST_CHR2GFX_COL38;
+        break;
+    case EGO_ST_CHR2GFX_COL38:
+        ego_chr2gfx_col38 = data;
         ego_state = EGO_ST_IDLE;
         char_to_video();
         break;

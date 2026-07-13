@@ -74,15 +74,26 @@ waitvcnt	lda VCOUNT
 		cmp #108
 		bne waitvcnt
 		
-		lda #14
-		sta colbk
+		;jsr time
+		
+;		lda #14
+;		sta colbk
 		jsr char3gfx
-		lda #0
-		sta colbk
+;		lda #0
+;		sta colbk
 		
 		lda direction
 		and #1
 		beq incxpos					;scroll left
+		
+		inc hscrol
+		inc hscrol
+		lda hscrol
+		cmp #8
+		bcc mainloop
+		
+		lda #0
+		sta hscrol
 		
 		lda dreadXPos					;check if zero
 		ora dreadXpos+1
@@ -95,8 +106,18 @@ decxpos		lda dreadXPos
 		dec dreadXPos+1
 decxpos1	dec dreadXPos
 		jmp mainloop
+
+
+incxpos		lda hscrol
+		beq incxpos2
+		dec hscrol
+		dec hscrol
+		jmp mainloop
 		
-incxpos		lda dreadXPos
+incxpos2	lda #6
+		sta hscrol
+		
+		lda dreadXPos
 		cmp #172
 		lda dreadXPos+1
 		sbc #1
@@ -253,10 +274,10 @@ initdlist	lda #64
 		lda #32+2
 		sta sdmctl
 		
-		lda savmsc+1
-		sta text+1
-		lda savmsc
-		sta text
+;		lda savmsc+1
+;		sta text+1
+;		lda savmsc
+;		sta text
 		        
 		lda #0
 		sta lmargn
@@ -420,6 +441,8 @@ char3title	lda #EGO_CMD_CHAR_TO_VIDEO
 		sta EGO_REG_DATA				;height
 		
 		sty EGO_REG_DATA				;charset 0
+		sty EGO_REG_DATA				;scroll 0
+		sta EGO_REG_DATA				;no col38
 		
 		jmp waitstatus
 		
@@ -458,6 +481,9 @@ char3gfx	lda #EGO_CMD_CHAR_TO_VIDEO
 		
 		lda #1
 		sta EGO_REG_DATA				;charset 0
+		lda hscrol
+		sta EGO_REG_DATA				;scroll
+		sty EGO_REG_DATA				;col38 = true
 
 waitstatus	lda EGO_REG_STATUS
 		bmi waitstatus
@@ -942,7 +968,16 @@ getstart2	lda consol
 		beq getstart2
 		pla
 		rts	
-		
+
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+time		ldy #0
+time1		dex
+		bne time1
+		dey
+		bne time1
+		rts
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
@@ -1025,6 +1060,7 @@ scry		.byte 0
 data		.byte 0
 dlino		.byte 0
 direction	.byte 0
+hscrol		.byte 0
 
 		icl "EgoDemo-Manta.asm"
 		
@@ -1079,15 +1115,15 @@ dl		.byte $70,$70
 
 		.byte $70+$80
 		
-		.byte $40+$02
-text:		.word 0
-		.byte 2, 2	
+;		.byte $40+$02
+;text:		.word 0
+;		.byte 2, 2	
 		.byte $41,a(dl)
 ;		.endl
 
 
 titlescr
-		.byte $30,$01,$1e,$19,$30,$7a,$7b,$30,$03,$30,$30,$30,$30,$30,$30,$30
+		.byte $01,$01,$1e,$19,$30,$7a,$7b,$30,$03,$30,$30,$30,$30,$30,$30,$30
 		.byte $30,$49,$69,$0a,$1e,$1c,$0e,$30,$30,$30,$30,$30,$30,$30,$30,$7a  
 		.byte $7b,$30,$03,$30,$02,$1e,$19,$30
 		.byte $30,$81,$9e,$99,$b0,$fa,$fb,$b0
