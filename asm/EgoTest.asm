@@ -8,6 +8,9 @@ screenPtr		= $84
 dreadPtr		= $86
 destPtr			= $88
 charSetPtr		= $8a
+temp			= $8c
+colorbk			= $8d
+colorpf0		= $8e
 
 WIDTH			= 40
 WIDTHPIX		= 160
@@ -25,21 +28,27 @@ titlechars		= dreadnaught-4*40
 titlegfx		= titlechars-4*8*40
 
 gfxmem			= $8010
+randomDataStorage 	= $0700
 
-		org $1000
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+
+		org $0800
+
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
 	
 		.proc main
 	
-		jsr initoutch
+		jsr GenerateRandomDataFromRNG
 		jsr initdlist
-		
-		jsr cpylevelcharset
 		jsr convert
 		jsr genTilePtrs
-		jsr fillhortab
-		
+		jsr setScreenLines
+		jsr uploadManta
 		jsr uploadMainCharset
-		jsr uploadSurfaceCharset
 		
 		ldx #0
 filltitle:	lda titlescr,x
@@ -47,17 +56,54 @@ filltitle:	lda titlescr,x
 		inx
 		cpx #160
 		bne filltitle
-		
-		jsr drawdread
-;		jsr char2gfx
-;		jsr cleartitle
-;		jsr char2title
-
-
-
+	
+		jsr initLevel
 		jsr char3title
-;		jsr char3gfx
 
+;
+; associate sprite0 with shape1
+;		
+		lda #EGO_CMD_SPRITE_DATA
+		sta EGO_REG_CMD
+		lda #0
+		sta EGO_REG_DATA				; sprite no
+		lda #$01					; shape number			
+		sta EGO_REG_DATA	
+
+;
+; set mode XOR (0) or MASK (1)
+;		
+		lda #EGO_CMD_SPRITE_MODE
+		sta EGO_REG_CMD
+		lda #0
+		sta EGO_REG_DATA
+		lda #1
+		sta EGO_REG_DATA
+
+;
+; set xy-pos sprite0
+;
+		lda #EGO_CMD_SET_SPRITE_XY
+		sta EGO_REG_CMD
+		lda #0
+		sta EGO_REG_DATA
+		lda #86						;x-pos lo
+		sta EGO_REG_DATA
+		lda #0
+		sta EGO_REG_DATA
+		lda #68						;y-pos lo
+		sta EGO_REG_DATA
+		lda #0
+		sta EGO_REG_DATA
+		
+;
+; enable sprite0
+;
+		lda #EGO_CMD_ENA_SPRITE
+		sta EGO_REG_CMD
+		lda #0
+		sta EGO_REG_DATA				;sprite number	
+				
 ;loop		jmp loop
 
 ;------------------------------------------------------------
@@ -74,47 +120,54 @@ waitvcnt	lda VCOUNT
 		cmp #108
 		bne waitvcnt
 		
-		;jsr time
+
+		jsr char3gfx		
+		jsr checkstick
+		jsr updateManta
+		jsr scrollSurface
+		jsr getstart
+		jsr getselect
+		jmp mainloop
+
+;------------------------------------------------------------
+; main loop
+;------------------------------------------------------------
+scrollSurface	lda hspeed
+		asl
+		sta temp
+		bmi incxpos					;scroll left
 		
-;		lda #14
-;		sta colbk
-		jsr char3gfx
-;		lda #0
-;		sta colbk
-		
-		lda direction
-		and #1
-		beq incxpos					;scroll left
-		
-		inc hscrol
-		inc hscrol
+		clc
 		lda hscrol
+		adc temp
 		cmp #8
-		bcc mainloop
-		
-		lda #0
+		bcs decxpos2
 		sta hscrol
+		rts	
 		
+decxpos2	and #6
+		sta hscrol
 		lda dreadXPos					;check if zero
 		ora dreadXpos+1
 		bne decxpos	
 		inc direction
-		jmp mainloop
+		rts
 
 decxpos		lda dreadXPos
 		bne decxpos1
 		dec dreadXPos+1
 decxpos1	dec dreadXPos
-		jmp mainloop
+		rts
 
 
-incxpos		lda hscrol
-		beq incxpos2
-		dec hscrol
-		dec hscrol
-		jmp mainloop
+incxpos		clc
+		lda hscrol
+		adc temp
+		bmi incxpos3
+		sta hscrol
+		rts
 		
-incxpos2	lda #6
+incxpos3	and #6
 		sta hscrol
 		
 		lda dreadXPos
@@ -123,39 +176,156 @@ incxpos2	lda #6
 		sbc #1
 		bcc incxpos1
 		inc direction
-		jmp mainloop
+		rts
 		
 incxpos1	inc dreadXPos
-		bne mainloop1
+		bne incxpos2
 		inc dreadXPos+1
+incxpos2	rts
 		
-mainloop1	jmp mainloop
-		
+
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-initoutch	ldx	$E406				;CHAR PUT routine
-		ldy	$E407
-		inx
-		stx	OUTCH+1
-		bne	geoutch1
-		iny
-geoutch1:	sty	OUTCH+2
-		rts
+updateManta	jmp updateManta4
+
+		dec mantajfy
+		bpl checkstick
+		lda #3
+		sta mantajfy
 		
+		dec mantacnt
+		bpl updateManta1
+		lda #15
+		sta mantacnt
+
+updateManta1	lda #EGO_CMD_SPRITE_DATA
+		sta EGO_REG_CMD
+		lda #0
+		sta EGO_REG_DATA
+		lda mantacnt
+		sta EGO_REG_DATA
+		
+
+		
+updateManta4	lda hspeed
+		sta $0600
+
+		lda #EGO_CMD_SET_SPRITE_Y
+		sta EGO_REG_CMD
+		lda #0						;sprite 0
+		sta EGO_REG_DATA
+		lda mantaYpos
+		sta EGO_REG_DATA
+		lda #0
+		sta EGO_REG_DATA
+		
+updateManta3	lda #EGO_CMD_RENDER_SPRITES
+		sta EGO_REG_CMD
+		jmp waitstatus
+
+;------------------------------------------------------------
+; joystick input routine
+;------------------------------------------------------------
+checkstick	lda stick0
+		lsr
+		bcc stickup
+		lsr
+		bcc stickdown
+
+checkstickleft	dec stickjiffy
+		bpl checkstickleft1
+		ldx #4
+		stx stickjiffy
+
+		lda stick0
+		lsr
+		lsr
+		lsr
+		bcc stickleft
+		lsr
+		bcc stickright
+checkstickleft1	rts
+		
+stickleft	lda hspeed
+		bmi stickleft1
+		cmp #4
+		bcs stickleft2
+stickleft1	inc hspeed
+stickleft2	rts
+
+stickright	lda hspeed
+		bpl stickright1
+		cmp #$fd
+		bcc stickright2
+stickright1	dec hspeed
+stickright2	rts
+
+stickdown	lda mantaYpos
+		adc #3
+		cmp #137
+		bcc stickdown1
+		lda #137
+stickdown1	sta mantaYpos
+stickdown2	bne checkstickleft
+
+stickup		lda mantaYpos
+		sbc #2						;=3 (carry clear)
+		cmp #22
+		bcs stickup1
+		lda #21
+stickup1	bne stickdown1
+		
+		
+;------------------------------------------------------------
+; initialize a level
+;------------------------------------------------------------
+initLevel	lda #0
+		sta dbgpos
+		
+		ldx level
+		txa
+		jsr puthex
+		
+		lda levelColorBak,x
+		sta colorbk
+		lda levelColorPf0,x
+		sta colorpf0
+		
+		jsr uploadSurfaceCharset
+		jsr drawdread
+				
+		rts
+
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
 uploadMainCharset		
 		lda #<mainCharacterSet
 		ldx #>mainCharacterSet
-		ldy #0
-		beq uploadCharset
+		ldy #0					;charsetno
+		jsr uploadCharset
+		jmp uploadCharset1
 		
 uploadSurfaceCharset
 		lda #<surCommCharset
 		ldx #>surCommCharset
-		ldy #1					;fall through
+		ldy #1
+		jsr uploadCharset
+		
+		ldx level
+		clc
+		lda charsetArray,x
+		adc ptr+1
+		sta ptr+1
+		
+		lda ptr+1
+		jsr puthex
+		lda ptr
+		jsr puthex
+		
+		jmp uploadCharset1
+	
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
@@ -166,15 +336,15 @@ uploadCharset	sta ptr
 		sta EGO_REG_CMD				;upload charset
 		sty EGO_REG_DATA			;charset no 0 of 1
 
-		ldx #8
+uploadCharset1	ldx #4					;upload 1k;
 		ldy #0
-uploadCharset1	lda (ptr),y
+uploadCharset2	lda (ptr),y
 		sta EGO_REG_DATA
 		iny
-		bne uploadCharset1
+		bne uploadCharset2
 		inc ptr+1
 		dex
-		bne uploadCharset1
+		bne uploadCharset2
 		rts
 
 ;------------------------------------------------------------
@@ -183,67 +353,53 @@ uploadCharset1	lda (ptr),y
 dliproc		pha
 		
 		lda dlino
-		bmi dliproc1
+		
 		beq dli0
 		cmp #1
 		beq dli1
-		cmp #4
-		beq dli4
-		
-dli		lda #0
-		sta grafp1	
-		lda #$6f
-		sta colpm1
-		lda #$00
-		sta colpm0
-		
-		;jmp dliproc0
+		cmp #2
+		beq dli2
 
-		txa
-		pha
-		ldx dlino
-		lda hor1tab,x
-		sta wsync
-		sta hposp1
-		lda #1
-		sta grafp1
-		sta wsync
-		lda #0
-		sta grafp1		
-		pla
-		tax
-		jmp dliproc0
+dliproc0	dec dlino
+dliproc1	pla
+		rti
 
-dli4		lda #$10
+;
+; turn on yellow(gold) player coloring
+;
+dli2		lda #$10
 		sta colpm0
 		sta colpm1
 		lda #$ff
+		sta grafp0
 		sta grafp1
 		bne dliproc0
 
-dli1		lda #4
-		sta prior
-		lda #$02
+;
+; turn off yellow(gold) player coloring
+;
+dli1		lda #$00
+		sta grafp0
+		sta grafp1
+		lda #$04
 		sta wsync
 		sta colpf1
+		lda colorbk
+		sta colbk
+		lda colorpf0
+		sta colpf0
 		lda #$0f
 		sta colpf2
 		bne dliproc0
 
-dli0		lda #$0f
+dli0		lda #$02
+		sta dlino
+		lda #$0f
 		sta wsync
 		sta colpf1
-		lda #$02
+		lda #$00
 		sta colpf2
-		lda #140
-		sta hposp1
-		lda #$04
-		sta dlino
-		bne dliproc1
-		
-dliproc0	dec dlino
-dliproc1	pla
-		rti
+		beq dliproc1
 
 ;------------------------------------------------------------
 ;
@@ -268,42 +424,25 @@ dliproc1	pla
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-initdlist	lda #64
-		sta nmien
-
-		lda #32+2
+initdlist	lda #0
 		sta sdmctl
+		sta nmien
 		
-;		lda savmsc+1
-;		sta text+1
-;		lda savmsc
-;		sta text
-		        
-		lda #0
-		sta lmargn
-		lda #$7d
-		jsr print
-		
-		lda #4
+		lda #2
 		sta dlino
-		
-		mwa #dliproc vdslst
-		mwa #dl sdlstl
-		
+
 		mva #$00 color4	;00	backgound
 		mva #$16 color0	;01
 		mva #$0f color1	;10
 		mva #$00 color2	;11
-		mva #$18 color3
+		;mva #$18 color3
 
 		lda #$00
 		sta pcolor0
 		sta pcolor1
 		
 		lda #3						;enable players and missiles
-		;sta gractl
 		sta sizep0
-		;sta sizep1
 		
 		lda #8
 		sta gprior
@@ -313,43 +452,33 @@ initdlist	lda #64
 		sta grafp1
 		sta grafp2
 		sta grafp3
+		
 		lda #108
 		sta hposp0
 		lda #140
 		sta hposp1
-
-		ldx rtclok+2
-		inx
-		inx
-waitvbi		cpx rtclok+2
+		
+waitvbi		lda vcount
 		bne waitvbi
 		
-waitvbi1	lda vcount
-		bne waitvbi1
-
-;		sei
+		lda #<dliproc 
+		sta vdslst
+		lda #>dliproc 
+		sta vdslst+1
+		
+		lda #<dl
+		sta dlistl
+		sta sdlstl
+		lda #>dl
+		sta dlistl+1
+		sta sdlstl+1
+		
 		lda #192
 		sta nmien
-		rts
-	
-;------------------------------------------------------------
-; table for Player stars horizontal tab
-;------------------------------------------------------------
-fillhortab	ldx #99
-fillhartab1	lda random
-		and #$7f
-;		clc
-		adc #40
-		sta hor1tab,x
-		dex
-		bpl fillhartab1
 		
-;		ldx #3
-;		lda #40
-;		sta hor1tab,x
-;		dex
-;		lda #140
-;		sta hor1tab,x
+		lda #32+2
+		sta sdmctl
+		sta dmactl
 		rts
 
 ;------------------------------------------------------------
@@ -382,36 +511,85 @@ fillhartab1	lda random
 		
 		
 ;------------------------------------------------------------
-; copy charsetdata for level
+; set line addresses and blitwidth/heigt (40 / 136)
 ;------------------------------------------------------------
-cpylevelcharset	ldx #0
-		lda levelCharsetData,x
-		clc
-		adc #>surfaceCharset
+setScreenLines	lda #EGO_CMD_SET_BLIT_WIDTH	
+		sta EGO_REG_CMD
+		lda #40						;BLITWIDTH
+		sta EGO_REG_DATA
+		
+		lda #EGO_CMD_SET_BLIT_HEIGHT
+		sta EGO_REG_CMD
+		lda #136			
+		sta EGO_REG_DATA
+
+
+		lda #<gfxmem
+		sta ptr
+		lda #>gfxmem
 		sta ptr+1
-;		jsr puthex
-
-		lda #<surfaceCharset
-		sta ptr		
-;		jsr puthex
 		
-		lda #<levelCharset
-		sta destPtr
-		lda #>levelCharset
-		sta destPtr+1
+		lda #EGO_CMD_ABORT
+		sta EGO_REG_CMD
 		
-		ldx #4
-		ldy #0
-cpylevelc1	lda (ptr),y
-		sta (destPtr),y
-		iny
-		bne cpylevelc1
+		lda #EGO_CMD_LINE_PTR
+		sta EGO_REG_CMD
+		ldx #136
+		stx EGO_REG_DATA
+		
+setScreenLines1	lda ptr
+		sta EGO_REG_DATA
+		lda ptr+1
+		sta EGO_REG_DATA
+		
+		clc
+		lda ptr
+		adc #40
+		sta ptr
+		bcc setScreenLines2
 		inc ptr+1
-		inc destPtr+1
-		dex
-		bne cpylevelc1
+		
+setScreenLines2	dex
+		bne setScreenLines1
+		
 		rts
-
+		
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+uploadManta	lda #<mantaShipSprites
+		sta ptr
+		lda #>mantaShipSprites
+		sta ptr+1
+		
+		ldx #0
+uploadManta2	ldy #0
+		lda #EGO_CMD_SHAPE_DATA
+		sta EGO_REG_CMD
+		stx EGO_REG_DATA				;shape no
+		lda #3		
+		sta EGO_REG_DATA				;shape x bytes
+		lda #21				
+		sta EGO_REG_DATA				;shape y lines
+		lda #2				
+		sta EGO_REG_DATA				;shape bpp
+uploadManta3	lda (ptr),y
+		sta EGO_REG_DATA
+		iny
+		cpy #63
+		bne uploadManta3
+		
+		clc
+		lda ptr
+		adc #64
+		sta ptr
+		bcc uploadManta1
+		inc ptr+1
+uploadManta1	inx
+		cpx #46
+		bne uploadManta2
+		rts
+		
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
@@ -491,144 +669,144 @@ waitstatus	lda EGO_REG_STATUS
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-char2title
-		lda #0
-		sta scry
-		
-		lda #<titlescr
-		sta dreadPtr
-		lda #>titlescr
-		sta dreadPtr+1
-		
-char2title3	ldx #0
-
-char2title2	ldy scry
-		clc
-		txa
-		adc titleYTabLo,y
-		sta destPtr
-		lda titleYTabHi,y
-		adc #0
-		sta destPtr+1
-		
-		txa
-		tay
-		lda (dreadPtr),y
-		asl
-		rol charsetPtr+1
-		asl
-		rol charsetPtr+1
-		asl
-		rol charsetPtr+1
-		clc
-		adc #<mainCharacterSet
-		sta charSetPtr
-		lda charsetPtr+1
-		and #7
-		adc #>mainCharacterSet
-		sta charsetPtr+1
-
-		ldy #0
-copychar3	lda (charsetPtr),y
-		sta (destPtr),y
-		lda destPtr
-		adc #39
-		sta destPtr
-		bcc copychar2
-		inc destPtr+1
-copychar2	iny
-		cpy #8
-		bcc copychar3
-
-char2title1	inx
-		cpx #40
-		bcc char2title2
-		
-		lda dreadPtr
-		adc #39
-		sta dreadPtr
-		bcc char2title4
-		inc dreadPtr+1
-		
-char2title4	inc scry
-		lda scry
-		cmp #4
-		bne char2title3
-		rts
-
-;------------------------------------------------------------
+;char2title
+;		lda #0
+;		sta scry
+;		
+;		lda #<titlescr
+;		sta dreadPtr
+;		lda #>titlescr
+;		sta dreadPtr+1
+;		
+;char2title3	ldx #0
 ;
-;------------------------------------------------------------
-char2gfx	
-		lda #0
-		sta scry
-		
-		clc
-		lda #<dreadnaught
-		adc dreadXPos
-		sta dreadPtr
-		lda #>dreadnaught
-		adc dreadXpos+1
-		sta dreadPtr+1
-
-char2gfx3	ldx #0
-
-char2gfx2	ldy scry
-		;clc
-		txa
-		adc gfxYTabLo,y
-		sta destPtr
-		lda gfxYTabHi,y
-		adc #0
-		sta destPtr+1
-			
-		txa
-		tay
-		lda (dreadPtr),y
-		asl
-		rol charsetPtr+1
-		asl
-		rol charsetPtr+1
-		asl
-		rol charsetPtr+1
-		clc
-		adc #<surCommCharset
-		sta charSetPtr
-		lda charsetPtr+1
-		and #7
-		adc #>surCommCharset
-		sta charsetPtr+1
-
-		ldy #0
+;char2title2	ldy scry
 ;		clc
-copychar	lda (charsetPtr),y
-		sta (destPtr),y
-		lda destPtr
-		adc #39
-		sta destPtr
-		bcc copychar1
-		inc destPtr+1
-copychar1	iny
-		cpy #8
-		bcc copychar
-
-char2gfx1	inx
-		cpx #40
-		bcc char2gfx2
-		
-		inc dreadPtr+1
-		inc dreadPtr+1
-		
-		inc scry
-		lda scry
-		cmp #17
-		bne char2gfx3
-		rts
+;		txa
+;		adc titleYTabLo,y
+;		sta destPtr
+;		lda titleYTabHi,y
+;		adc #0
+;		sta destPtr+1
+;		
+;		txa
+;		tay
+;		lda (dreadPtr),y
+;		asl
+;		rol charsetPtr+1
+;		asl
+;		rol charsetPtr+1
+;		asl
+;		rol charsetPtr+1
+;		clc
+;		adc #<mainCharacterSet
+;		sta charSetPtr
+;		lda charsetPtr+1
+;		and #7
+;		adc #>mainCharacterSet
+;		sta charsetPtr+1
+;
+;		ldy #0
+;copychar3	lda (charsetPtr),y
+;		sta (destPtr),y
+;		lda destPtr
+;		adc #39
+;		sta destPtr
+;		bcc copychar2
+;		inc destPtr+1
+;copychar2	iny
+;		cpy #8
+;		bcc copychar3
+;
+;char2title1	inx
+;		cpx #40
+;		bcc char2title2
+;		
+;		lda dreadPtr
+;		adc #39
+;		sta dreadPtr
+;		bcc char2title4
+;		inc dreadPtr+1
+;		
+;char2title4	inc scry
+;		lda scry
+;		cmp #4
+;		bne char2title3
+;		rts
+;
+;;------------------------------------------------------------
+;;
+;;------------------------------------------------------------
+;char2gfx	
+;		lda #0
+;		sta scry
+;		
+;		clc
+;		lda #<dreadnaught
+;		adc dreadXPos
+;		sta dreadPtr
+;		lda #>dreadnaught
+;		adc dreadXpos+1
+;		sta dreadPtr+1
+;
+;char2gfx3	ldx #0
+;
+;char2gfx2	ldy scry
+;		;clc
+;		txa
+;		adc gfxYTabLo,y
+;		sta destPtr
+;		lda gfxYTabHi,y
+;		adc #0
+;		sta destPtr+1
+;			
+;		txa
+;		tay
+;		lda (dreadPtr),y
+;		asl
+;		rol charsetPtr+1
+;		asl
+;		rol charsetPtr+1
+;		asl
+;		rol charsetPtr+1
+;		clc
+;		adc #<surCommCharset
+;		sta charSetPtr
+;		lda charsetPtr+1
+;		and #7
+;		adc #>surCommCharset
+;		sta charsetPtr+1
+;
+;		ldy #0
+;;		clc
+;copychar	lda (charsetPtr),y
+;		sta (destPtr),y
+;		lda destPtr
+;		adc #39
+;		sta destPtr
+;		bcc copychar1
+;		inc destPtr+1
+;copychar1	iny
+;		cpy #8
+;		bcc copychar
+;
+;char2gfx1	inx
+;		cpx #40
+;		bcc char2gfx2
+;		
+;		inc dreadPtr+1
+;		inc dreadPtr+1
+;		
+;		inc scry
+;		lda scry
+;		cmp #17
+;		bne char2gfx3
+;		rts
 					
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-convert		ldx #8						;8 pages
+convert		ldx #16						;16 pages = 4kb
 		ldy #0
 		lda #<surCommCharset
 		sta ptr
@@ -686,9 +864,10 @@ drawdread1	sta (screenPtr),y
 		dex
 		bne drawdread1
 		
-		lda #<levelOneDreadnoughtData
+		ldx level
+		lda textureDataForLevelLoPtrArray,x
 		sta dreadPtr
-		lda #>levelOneDreadnoughtData
+		lda textureDataForLevelHiPtrArray,x
 		sta dreadPtr+1
 		
 drawdread2	ldy #0
@@ -885,22 +1064,22 @@ firstline	.word dreadnaught+16*512
 ;		.byte >(SCREEN+04*40-12), >(SCREEN+03*40-13), >(SCREEN+02*40-14), >(SCREEN+01*40-15)
 ;		.byte >(SCREEN+00*40-16)
 
-gfxYTabLo:	.byte <(gfxmem + 00 * 320), <(gfxmem + 01 * 320), <(gfxmem + 02 * 320), <(gfxmem + 03 * 320)
-		.byte <(gfxmem + 04 * 320), <(gfxmem + 05 * 320), <(gfxmem + 06 * 320), <(gfxmem + 07 * 320)
-		.byte <(gfxmem + 08 * 320), <(gfxmem + 09 * 320), <(gfxmem + 10 * 320), <(gfxmem + 11 * 320)
-		.byte <(gfxmem + 12 * 320), <(gfxmem + 13 * 320), <(gfxmem + 14 * 320), <(gfxmem + 15 * 320)
-		.byte <(gfxmem + 16 * 320), <(gfxmem + 17 * 320), <(gfxmem + 18 * 320), <(gfxmem + 19 * 320)
-		.byte <(gfxmem + 20 * 320), <(gfxmem + 21 * 320), <(gfxmem + 22 * 320), <(gfxmem + 23 * 320)
-		
-gfxYTabHi:	.byte >(gfxmem + 00 * 320), >(gfxmem + 01 * 320), >(gfxmem + 02 * 320), >(gfxmem + 03 * 320)
-		.byte >(gfxmem + 04 * 320), >(gfxmem + 05 * 320), >(gfxmem + 06 * 320), >(gfxmem + 07 * 320)
-		.byte >(gfxmem + 08 * 320), >(gfxmem + 09 * 320), >(gfxmem + 10 * 320), >(gfxmem + 11 * 320)
-		.byte >(gfxmem + 12 * 320), >(gfxmem + 13 * 320), >(gfxmem + 14 * 320), >(gfxmem + 15 * 320)
-		.byte >(gfxmem + 16 * 320), >(gfxmem + 17 * 320), >(gfxmem + 18 * 320), >(gfxmem + 19 * 320)
-		.byte >(gfxmem + 20 * 320), >(gfxmem + 21 * 320), >(gfxmem + 22 * 320), >(gfxmem + 23 * 320)
-		
-titleYTabLo	.byte <(titlegfx + 0 * 320), <(titlegfx + 1 * 320), <(titlegfx + 2 * 320), <(titlegfx + 3 * 320)
-titleYTabHi	.byte >(titlegfx + 0 * 320), >(titlegfx + 1 * 320), >(titlegfx + 2 * 320), >(titlegfx + 3 * 320)
+;gfxYTabLo:	.byte <(gfxmem + 00 * 320), <(gfxmem + 01 * 320), <(gfxmem + 02 * 320), <(gfxmem + 03 * 320)
+;		.byte <(gfxmem + 04 * 320), <(gfxmem + 05 * 320), <(gfxmem + 06 * 320), <(gfxmem + 07 * 320)
+;		.byte <(gfxmem + 08 * 320), <(gfxmem + 09 * 320), <(gfxmem + 10 * 320), <(gfxmem + 11 * 320)
+;		.byte <(gfxmem + 12 * 320), <(gfxmem + 13 * 320), <(gfxmem + 14 * 320), <(gfxmem + 15 * 320)
+;		.byte <(gfxmem + 16 * 320), <(gfxmem + 17 * 320), <(gfxmem + 18 * 320), <(gfxmem + 19 * 320)
+;		.byte <(gfxmem + 20 * 320), <(gfxmem + 21 * 320), <(gfxmem + 22 * 320), <(gfxmem + 23 * 320)
+;		
+;gfxYTabHi:	.byte >(gfxmem + 00 * 320), >(gfxmem + 01 * 320), >(gfxmem + 02 * 320), >(gfxmem + 03 * 320)
+;		.byte >(gfxmem + 04 * 320), >(gfxmem + 05 * 320), >(gfxmem + 06 * 320), >(gfxmem + 07 * 320)
+;		.byte >(gfxmem + 08 * 320), >(gfxmem + 09 * 320), >(gfxmem + 10 * 320), >(gfxmem + 11 * 320)
+;		.byte >(gfxmem + 12 * 320), >(gfxmem + 13 * 320), >(gfxmem + 14 * 320), >(gfxmem + 15 * 320)
+;		.byte >(gfxmem + 16 * 320), >(gfxmem + 17 * 320), >(gfxmem + 18 * 320), >(gfxmem + 19 * 320)
+;		.byte >(gfxmem + 20 * 320), >(gfxmem + 21 * 320), >(gfxmem + 22 * 320), >(gfxmem + 23 * 320)
+;		
+;titleYTabLo	.byte <(titlegfx + 0 * 320), <(titlegfx + 1 * 320), <(titlegfx + 2 * 320), <(titlegfx + 3 * 320)
+;titleYTabHi	.byte >(titlegfx + 0 * 320), >(titlegfx + 1 * 320), >(titlegfx + 2 * 320), >(titlegfx + 3 * 320)
 
 ;------------------------------------------------------------
 ; generate tileDataPtrs
@@ -939,35 +1118,50 @@ genTilePtrs6	lda tileDataPtr
 		inx
 		jmp genTilePtrs4
 		
-genTilePtrs3	stx numberOfTiles
-;		txa
-;		jsr puthex
-		
-;		ldx #0
-;genTilePtrs5	lda tileDataPtrHi,x
-;		jsr puthex
-;		lda tileDataPtrLo,x
-;		jsr puthex
-;		jsr space
-;		inx
-;		cpx #6
-;		bne genTilePtrs5
-		
+genTilePtrs3	stx numberOfTiles		
 		rts
+
+;-------------------------------------------------------------------
+; GenerateRandomDataFromRNG
+;-------------------------------------------------------------------
+GenerateRandomDataFromRNG
+		ldx #$00
+GenerateRandom1	lda random					; Random Number Generator
+		eor randomDataStorage,X
+		sta randomDataStorage,X
+		inx
+		bne GenerateRandom1
+		rts
+		
+
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+getstart	lda #1
+		bit consol
+		bne getstart1
+		
+getstart2	bit consol
+		beq getstart2
+		inc level
+		jsr initLevel
+		
+getstart1	rts	
 
 
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-getstart	pha
-getstart1	lda consol
-		and #1
-		bne getstart1
-getstart2	lda consol
-		and #1
-		beq getstart2
-		pla
-		rts	
+getselect	lda #2
+		bit consol
+		bne getselect1
+		
+getselect2	bit consol
+		beq getselect2
+		dec level
+		jsr initLevel
+		
+getselect1	rts	
 
 ;------------------------------------------------------------
 ;
@@ -1034,8 +1228,9 @@ puthex:		pha
 	
 	
 PUTNIB:		clc
-		adc	#'0'
-		cmp	#'9'+1
+		adc	#16
+;		adc	#'0'
+		cmp	#16+10
 		bcc	PUTNIB1
 		adc	#6
 PUTNIB1:	jmp	OUTCH
@@ -1044,10 +1239,15 @@ PUTNIB1:	jmp	OUTCH
 ;============================================================
 ; jump to E:-handler put routine
 ;============================================================
-OUTCH:		jmp 0
+OUTCH:		ldx dbgpos
+		sta $0601,x
+		inc dbgpos
+		rts
 
 mantacnt	.byte 0
+mantaYpos	.byte 68
 mantajfy	.byte 8
+stickjiffy	.byte 8
 tileColumnCnt	.byte 0
 tileRowCnt	.byte 0
 numberOfTiles	.byte 0
@@ -1061,14 +1261,16 @@ data		.byte 0
 dlino		.byte 0
 direction	.byte 0
 hscrol		.byte 0
+hspeed		.byte -1
+level		.byte 6
+dbgpos		.byte 0
 
 		icl "EgoDemo-Manta.asm"
 		
-		;.align $100
+mainCharacterSet
+		ins "main-charset.bin"
 surCommCharset
 		ins "surface-common-charset.bin"
-levelCharset
-:1024		.byte 0
 		icl "surface-charset.asm"
 		icl "EgoDemo-GameData.asm"
 		icl "EgoDemo-LevelData.asm"
@@ -1085,8 +1287,6 @@ tileDataPtrHi
 :160		.byte 0
 	
 		.align $400
-mainCharacterSet
-		ins "main-charset.bin"
 
 ;		.local dl
 		dc = $0e+$00
@@ -1099,7 +1299,7 @@ dl		.byte $70,$70
 :7		.byte $0f
 		.byte $0f+$80
 
-		.byte $70+$80,$70+$80
+		.byte $70,$70
 		
 ;.rept 136
 ;		.byte $40+dc
@@ -1113,11 +1313,11 @@ dl		.byte $70,$70
 		.word gfxmem+102*40
 :33		.byte dc
 
-		.byte $70+$80
+		.byte $70,$70+$80
 		
-;		.byte $40+$02
-;text:		.word 0
-;		.byte 2, 2	
+		.byte $40+$02
+text:		.word $0600
+		.byte 2
 		.byte $41,a(dl)
 ;		.endl
 

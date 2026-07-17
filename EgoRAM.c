@@ -391,13 +391,14 @@ void __not_in_flash_func(char_to_video)()
             for (x = 0; x < ego_chr2gfx_width; x++)
             {
                 c = charset_array[ego_charset_no][(video_ram[src_pos + x] << 3) + line];
-                if (ego_chr2gfx_col38 != 0 & (x == 0 || x == 39))
-                    b = 0;
-                else
-                    b |= (c >> ego_chr2gfx_scroll);
-
+                b |= (c >> ego_chr2gfx_scroll);
                 video_ram[dst_pos + line * ego_dst_inc + x] = b;
                 b = c << (8 - ego_chr2gfx_scroll);
+            }
+            if (ego_chr2gfx_col38)
+            {
+                video_ram[dst_pos + line * ego_dst_inc] = 0;
+                video_ram[dst_pos + line * ego_dst_inc + 39] = 0;
             }
         }
         src_pos += ego_src_inc;
