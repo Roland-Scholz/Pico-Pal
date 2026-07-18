@@ -1,5 +1,5 @@
 #define EGO_MAX_SPRITES 64
-#define EGO_MAX_SHAPES 64
+#define EGO_MAX_SHAPES 256
 
 #define EGO_MODE_ATARI 0
 #define EGO_MODE_USB 1
@@ -78,6 +78,7 @@
 
 #define EGO_MODE_XOR 0
 #define EGO_MODE_MASK 1
+#define EGO_MODE_SPECIAL 2
 
 /*
 Sprite data:
@@ -94,6 +95,7 @@ typedef struct
 	uint8_t bitsperpix;
 	uint8_t *data;
 	uint8_t *mask;
+	uint8_t *shadow;
 } shape_t;
 
 typedef struct

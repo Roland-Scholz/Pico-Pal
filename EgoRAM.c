@@ -177,10 +177,10 @@ void __not_in_flash_func(sprite_draw)(sprite_t *sp)
     int xlen, ylen;
     int i, x, y;
     uint8_t mask;
+    uint8_t shadow;
     uint16_t vpos;
     uint8_t *sppos, *mpos;
     uint8_t b, c, m, data;
-    bool maskon;
 
     // ego_log("blitwidth: %d, blitheight %d\n", ego_blitwidth, ego_blitheight);
     // ego_log("sprite_draw: shape_no:%d, x:%d y:%d, width:%d, height: %d, bpp: %d\n", shape_no, xpos, ypos, width, height, bpp);
@@ -196,26 +196,32 @@ void __not_in_flash_func(sprite_draw)(sprite_t *sp)
     if (shape_array[shape_no].bitsperpix == 2 && shape_array[shape_no].mask == NULL)
     {
         shape_array[shape_no].mask = malloc(width * height);
+        shape_array[shape_no].shadow = malloc(width * height);
 
         vpos = 0;
         for (y = 0; y < height; y++)
         {
-            maskon = false;
             for (x = 0; x < width; x++)
             {
                 mask = 0xc0;
+                shadow = 0x80;
+
                 data = shape_array[shape_no].data[vpos];
                 shape_array[shape_no].mask[vpos] = 0;
+                shape_array[shape_no].shadow[vpos] = 0;
 
                 for (i = 0; i < 4; i++)
                 {
                     if (!(data & mask))
                     {
                         shape_array[shape_no].mask[vpos] |= mask;
-                        // if (!(data & mask))
-                        //   maskon = ~maskon;
+                    }
+                    else
+                    {
+                        shape_array[shape_no].shadow[vpos] |= shadow;
                     }
                     mask >>= 2;
+                    shadow >>= 2;
                 }
                 // ego_log("%02X ", shape_array[shape_no].mask[vpos]);
                 vpos++;
@@ -233,7 +239,7 @@ void __not_in_flash_func(sprite_draw)(sprite_t *sp)
     ylen = height - ystart;
 
     // check bottom bound
-    if (ypos >= ego_blitheight + height)
+    if (ypos >= ego_blitheight)
     {
         ylen = ego_blitheight + height - ypos;
     }
@@ -255,14 +261,20 @@ void __not_in_flash_func(sprite_draw)(sprite_t *sp)
     if (bytex > ego_blitwidth)
         xlen = bytex - ego_blitwidth;
 
-    sppos = &(shape_array[shape_no].data[ystart * width + xstart]);
+    if (sp->mode == EGO_MODE_SPECIAL)
+    {
+        sppos = &(shape_array[shape_no].shadow[ystart * width + xstart]);
+    }
+    else
+    {
+        sppos = &(shape_array[shape_no].data[ystart * width + xstart]);
+    }
     mpos = &(shape_array[shape_no].mask[ystart * width + xstart]);
 
     // ego_log("sprite bytex:%d pixx:%d xstart:%d xlen:%d xvstart:%d ystart:%d ylen:%d vstart:%d mpos: %p sppos: %p\n", bytex, pixx, xstart, xlen, xvstart, ystart, ylen, vstart, mpos, sppos);
 
     for (y = 0; y < ylen; y++)
     {
-
         vpos = ego_line_ptr[vstart + y] + xvstart;
 
         c = 0;
@@ -277,15 +289,34 @@ void __not_in_flash_func(sprite_draw)(sprite_t *sp)
         {
             b = read_vram(vpos + x);
 
-            if (sp->mode == EGO_MODE_MASK)
-            {
-                b &= (m | (mpos[x] >> pixx));
-                b |= (c | (sppos[x] >> pixx));
-            }
-            else
+            if (sp->mode == EGO_MODE_XOR)
             {
                 b ^= (c | (sppos[x] >> pixx));
             }
+            else
+            {
+                if (sp->mode == EGO_MODE_MASK)
+                {
+                    b &= (m | (mpos[x] >> pixx));
+                    b |= (c | (sppos[x] >> pixx));
+                }
+                else
+                {
+                    mask = 0xc0;
+                    c |= (sppos[x] >> pixx);
+                    for (i = 0; i < 4; i++)
+                    {
+                        if (!(b & mask))
+                        {
+                            c &= ~mask;
+                        }
+                        mask >>= 2;
+                    }
+                    b &= (m | (mpos[x] >> pixx));
+                    b |= c;
+                }
+            }
+
             write_vram(vpos + x, b);
 
             c = (sppos[x]) << (8 - pixx);
@@ -295,14 +326,26 @@ void __not_in_flash_func(sprite_draw)(sprite_t *sp)
         if (pixx != 0 && bytex < ego_blitwidth)
         {
             b = read_vram(vpos + x);
-            if (sp->mode == EGO_MODE_MASK)
+            if (sp->mode == EGO_MODE_XOR)
             {
-                b &= (m | fill_back[pixx]);
-                b |= c;
+                b ^= c;
             }
             else
             {
-                b ^= c;
+                if (sp->mode == EGO_MODE_SPECIAL)
+                {
+                    mask = 0xc0;
+                    for (i = 0; i < 4; i++)
+                    {
+                        if (!(b & mask))
+                        {
+                            c &= ~mask;
+                        }
+                        mask >>= 2;
+                    }
+                }
+                b &= (m | fill_back[pixx]);
+                b |= c;
             }
             write_vram(vpos + x, b);
         }
@@ -317,7 +360,7 @@ void __not_in_flash_func(render_sprites)(void)
 
     sprite_t *sp;
 
-    for (int i = 0; i < EGO_MAX_SPRITES; i++)
+    for (int i = EGO_MAX_SPRITES - 1; i >= 0; i--)
     {
         sp = &sprite_array[i];
 
