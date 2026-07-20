@@ -14,8 +14,10 @@ charSetPtr		= $8a
 temp			= $8c
 colorbk			= $8d
 colorpf0		= $8e
-rndidx			= $8f
-cnt			= $90
+colorpf1		= $8f
+colorpf2		= $90
+rndidx			= $91
+cnt			= $92
 
 WIDTH			= 40
 WIDTHPIX		= 160
@@ -34,10 +36,14 @@ titlegfx		= titlechars-4*8*40
 
 gfxmem			= $8010
 SCREEN_RAM_HIBANK	= gfxmem
+
 mantax			= 84
+mantay			= 68
 
 debugScreen		= $0600
 randomDataStorage 	= $0700
+
+explosion_major1	= 46
 
 ;------------------------------------------------------------
 ;
@@ -56,7 +62,7 @@ randomDataStorage 	= $0700
 		jsr convert
 		jsr genTilePtrs
 		jsr setScreenLines
-		jsr uploadManta
+		jsr uploadSprites
 		jsr uploadMainCharset
 		
 		ldx #0
@@ -65,66 +71,9 @@ filltitle:	lda titlescr,x
 		inx
 		cpx #160
 		bne filltitle
-	
-		jsr initLevel
 		jsr char3title
 
-;
-; associate sprite0 with shape1
-;		
-		lda #EGO_CMD_SPRITE_DATA
-		sta EGO_REG_CMD
-		lda #0						; sprite no
-		sta EGO_REG_DATA				
-		lda #$01					; shape number			
-		sta EGO_REG_DATA	
-
-;
-; associate sprite1 with shape1
-;		
-		lda #EGO_CMD_SPRITE_DATA
-		sta EGO_REG_CMD
-		lda #1						; sprite no
-		sta EGO_REG_DATA
-		lda #$01					; shape number			
-		sta EGO_REG_DATA
-;
-; set mode XOR (0) or MASK (1) or SPECIAL (2)
-;		
-		lda #EGO_CMD_SPRITE_MODE
-		sta EGO_REG_CMD
-		lda #0						; sprite no
-		sta EGO_REG_DATA
-		lda #EGO_MODE_MASK
-		sta EGO_REG_DATA
-
-		lda #EGO_CMD_SPRITE_MODE
-		sta EGO_REG_CMD
-		lda #1						; sprite no
-		sta EGO_REG_DATA
-		lda #EGO_MODE_SPECIAL
-		sta EGO_REG_DATA
-
-;
-; enable sprite0
-;
-		lda #EGO_CMD_ENA_SPRITE
-		sta EGO_REG_CMD
-		lda #0
-		sta EGO_REG_DATA				;sprite number	
-;
-; enable sprite1
-;
-		lda #EGO_CMD_ENA_SPRITE
-		sta EGO_REG_CMD
-		lda #1
-		sta EGO_REG_DATA				;sprite number	
-				
-;loop		jmp loop
-
-		lda #0
-		sta dreadXPos
-		sta dreadXPos+1
+restart		jsr initLevel
 
 ;------------------------------------------------------------
 ; main loop
@@ -132,50 +81,196 @@ filltitle:	lda titlescr,x
 mainloop	
 
 waitvcnt	lda VCOUNT
-		cmp #112
+		cmp #104
 		bne waitvcnt
+		
+		lda #10
+		sta colbk
 		
 		lda #0
 		sta dbgpos
 		
-		lda level
-		jsr puthex
-		jsr space
+;		lda level
+;		jsr puthex
+;		jsr space
 
-		lda hspeed
-		jsr puthex
-		jsr space
+;		lda hspeed
+;		jsr puthex
+;		jsr space
 		
-		lda dreadXPos+1
-		jsr puthex
-		lda dreadXPos
-		jsr puthex
+;		lda kbcode
+;		jsr puthex
+;		jsr space
+	
+;		lda xshadow
+;		jsr puthex
+		
+		jsr keyboard
 		
 		lda pause
 		and #1
 		bne mainpause
-		
-		lda #14
-		sta colbk
-		jsr char2gfx
-		jsr stars2gfx
 
+		lda dead
+		beq mainloop1
+		jsr explosion
+		jmp mainloop2
+		
+mainloop1	jsr scrollSurface
+		jsr collision
 		jsr checkstick
 		jsr updateManta
-		jsr renderSprites
 		
-		jsr scrollSurface
-		lda #0
-		sta colbk
+mainloop2	;lda #6
+		;sta colbk
+		jsr char2gfx
+		jsr stars2gfx
+		jsr renderSprites		
 
 mainpause	jsr getstart
 		jsr getselect
 		jsr getoption
 
-mainloop1	jmp mainloop
+		lda #$00
+		sta colbk
+		jmp mainloop
+
 
 ;------------------------------------------------------------
-; main loop
+; keyboard
+;------------------------------------------------------------
+keyboard	lda kbcode
+		cmp #$21					;space
+		bne keyboardEx
+		lda #0
+		sta hspeed	
+keyboardEx	rts
+
+;------------------------------------------------------------
+; explosion
+;------------------------------------------------------------
+explosion	lda dead
+		bmi explosion1
+
+		ldx #1
+		stx spriteModus+1
+		dex
+		stx mantajfy
+		stx spriteEna+1
+		stx turncnt
+		dex
+		stx dead
+		
+		ldx #7
+explosion3	jsr random3bit
+		adc mantaXPos
+		sta spriteXpos,x
+		jsr random4bit
+		adc mantaYpos
+		sta spriteYpos,x
+		lda #explosion_major1
+		sta spriteShape,x
+		lda #0
+		sta spriteEna,x
+		dex
+		bpl explosion3
+		rts
+
+explosion1	dec mantajfy
+		bpl explosionEx
+		lda #1
+		sta mantajfy
+		
+		ldx turncnt
+		cpx #8
+		bcs explosion9
+		inc spriteEna,x
+explosion9	cpx #19
+		bcc explosion5
+	
+		pla
+		pla
+		jmp restart
+		
+		
+explosion5	ldx #7
+explosion4	lda spriteEna,x
+		beq explosion6
+		lda spriteShape,x
+		cmp #explosion_major1+10
+		bcc explosion7
+		lda #0
+		sta spriteEna,x
+		beq explosion6
+explosion7	inc spriteShape,x
+explosion6	dex
+		bpl explosion4
+
+		inc turncnt		
+explosionEx	rts
+
+;------------------------------------------------------------
+; random4bit
+;------------------------------------------------------------
+random4bit	lda random
+		and #$0f
+		sec
+		sbc #8
+		clc
+		rts
+;------------------------------------------------------------
+; random3bit
+;------------------------------------------------------------
+random3bit	lda random
+		and #$07
+		sec
+		sbc #4
+		clc
+		rts
+;------------------------------------------------------------
+; collision
+;------------------------------------------------------------
+collision	sec
+		lda mantaYpos
+		sbc #20
+		lsr
+		lsr
+		and #$fe
+		tax
+		
+		clc
+		lda dreadXPos
+		sta ptr
+		txa
+		adc dreadXPos+1
+		sta ptr+1
+
+		ldx #3
+collision2	ldy #18
+collision1	lda (ptr),y
+		and #$F0
+		cmp #$80
+		bne collision4
+		inc dead
+collision4	iny
+		cpy #21
+		bne collision1
+
+		inc ptr+1
+		inc ptr+1
+collision3	dex
+		bne collision2
+
+		lda dead
+		beq collisionEx
+
+;		lda #$3f
+;		sta colbk
+		
+collisionEx	rts
+
+;------------------------------------------------------------
+; scrollSurface
 ;------------------------------------------------------------
 scrollSurface	lda hspeed
 		asl
@@ -196,9 +291,9 @@ decxpos2	and #6
 		bne decxpos
 		
 		lda dreadXPos					;check if zero
-		cmp #10
+		cmp #<(dreadnaught+1)
 		lda dreadXpos+1
-		sbc #0
+		sbc #>(dreadnaught+1)
 		bcs decxpos
 
 		dec turnactive
@@ -225,9 +320,9 @@ incxpos3	and #6
 		bne incxpos1
 		
 		lda dreadXPos
-		cmp #172
+		cmp #<(dreadnaught+$1ac)
 		lda dreadXPos+1
-		sbc #1
+		sbc #>(dreadnaught+$1ac)
 		bcc incxpos1
 		
 		inc turnactive
@@ -253,6 +348,7 @@ updateManta	lda turnactive
 updateManta2	lda #1
 		sta mantajfy
 
+		ldx turncnt
 		lda turnactive
 		bpl flipMantaLeft
 
@@ -286,75 +382,79 @@ flipmanta2	sta hspeed
 		stx turnactive
 		asl hspeed
 		
-updateManta1	ldx #0
-		lda #EGO_CMD_SET_SPRITE_XY
-		sta EGO_REG_CMD				
-		stx EGO_REG_DATA				;sprite 0
-		lda #mantax
-		sta EGO_REG_DATA
-		stx EGO_REG_DATA
-		lda mantaYpos					;y-pos lo
-		sta EGO_REG_DATA				
-		stx EGO_REG_DATA				;y-pos hi
+updateManta1	lda #mantax
+		sta spriteXpos
+		lda mantaYpos
+		sta spriteYpos
 
-		lda #EGO_CMD_SET_SPRITE_XY
-		sta EGO_REG_CMD
-		lda #1						;sprite 0
-		sta EGO_REG_DATA
 		clc						;x-pos lo
 		lda #mantax
 		adc xshadow
-		sta EGO_REG_DATA
-		stx EGO_REG_DATA
+		sta spriteXpos+1
 		lda mantaYpos					;y-pos lo
 		adc xshadow
-		sta EGO_REG_DATA						
-		stx EGO_REG_DATA				;y-pos hi
+		sta spriteYpos+1
 		rts
 		
 
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-shapeRightSeq	ldx turncnt
-		lda #EGO_CMD_SPRITE_DATA
-		sta EGO_REG_CMD
-		lda #0						;sprite no
-		sta EGO_REG_DATA
-		lda flipRightSeq,x				;shape no
-		sta EGO_REG_DATA
-		
-		lda #EGO_CMD_SPRITE_DATA
-		sta EGO_REG_CMD
-		lda #1						;sprite no
-		sta EGO_REG_DATA
-		lda flipRightSeq,x				;shape no
-		sta EGO_REG_DATA	
+shapeRightSeq	
+		lda flipRightSeq,x
+		sta spriteShape
+		sta spriteShape+1		
 		rts
 		
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-shapeLeftSeq	ldx turncnt
-		lda #EGO_CMD_SPRITE_DATA
-		sta EGO_REG_CMD
-		lda #0						;sprite no
-		sta EGO_REG_DATA
-		lda flipLeftSeq,x				;shape no
-		sta EGO_REG_DATA
-		
-		lda #EGO_CMD_SPRITE_DATA
-		sta EGO_REG_CMD
-		lda #1						;sprite no
-		sta EGO_REG_DATA
-		lda flipLeftSeq,x				;shape no
-		sta EGO_REG_DATA
+shapeLeftSeq	
+		lda flipLeftSeq,x
+		sta spriteShape
+		sta spriteShape+1		
 		rts
 		
 ;------------------------------------------------------------
 ; renderSprites
 ;------------------------------------------------------------
-renderSprites	lda #EGO_CMD_RENDER_SPRITES
+renderSprites	ldx #7
+renderSprites3	lda #EGO_CMD_DIS_SPRITE				;enable or disable sprite
+		ldy spriteEna,x
+		beq renderSprites1
+		lda #EGO_CMD_ENA_SPRITE
+renderSprites1	sta EGO_REG_CMD
+		stx EGO_REG_DATA
+		tya
+		beq renderSprites2
+		
+		lda #EGO_CMD_SPRITE_DATA			;associate sprite with shape
+		sta EGO_REG_CMD
+		stx EGO_REG_DATA
+		lda spriteShape,x
+		sta EGO_REG_DATA
+
+		lda #EGO_CMD_SPRITE_MODE
+		sta EGO_REG_CMD
+		stx EGO_REG_DATA
+		lda spriteModus,x
+		sta EGO_REG_DATA
+		
+		ldy #0
+		lda #EGO_CMD_SET_SPRITE_XY
+		sta EGO_REG_CMD
+		stx EGO_REG_DATA
+		lda spriteXpos,x
+		sta EGO_REG_DATA
+		sty EGO_REG_DATA
+		lda spriteYpos,x
+		sta EGO_REG_DATA
+		sty EGO_REG_DATA
+		
+renderSprites2	dex
+		bpl renderSprites3
+
+		lda #EGO_CMD_RENDER_SPRITES
 		sta EGO_REG_CMD
 		jmp waitstatus
 
@@ -423,23 +523,63 @@ stickup		lda mantaYpos
 		cmp #21
 		bcs stickup1
 		lda #21
-stickup1	bne stickdown1
-		
-		
+stickup1	jmp stickdown1
+
 ;------------------------------------------------------------
 ; initialize a level
 ;------------------------------------------------------------
-initLevel	ldx level
-				
+initLevel	ldx level	
 		lda levelColorBak,x
 		sta colorbk
 		lda levelColorPf0,x
 		sta colorpf0
+		lda #$02
+		sta colorpf1
+		lda #$0f
+		sta colorpf2
 
 		jsr genStars	
 		jsr uploadSurfaceCharset
 		jsr drawdread
 
+		ldx #5*8-1
+		lda #0
+initLevel1	sta spriteEna,x
+		dex
+		bpl initLevel1
+
+		stx hspeed					;X=$ff
+		inx
+		stx hscrol					;X=$00
+		stx turnactive
+		stx dead
+		inx
+		stx spriteEna					;X=$01
+		stx spriteEna+1
+		stx spriteShape
+		stx spriteShape+1
+		stx spriteModus
+		inx
+		stx spriteModus+1				;X=$02
+		
+		lda #mantax
+		sta spriteXpos
+		sta mantaXpos
+		lda #mantax+8
+		sta spriteXpos+1
+		lda #mantay
+		sta spriteYpos
+		sta mantaYpos
+		lda #mantay+8
+		sta spriteYpos+1
+
+		lda #<(dreadnaught+0)
+		sta dreadXPos
+		lda #>(dreadnaught+0)
+		sta dreadXPos+1	
+
+		lda #8
+		sta xshadow
 		rts
 
 ;------------------------------------------------------------
@@ -522,20 +662,21 @@ dli2		lda #$10
 
 ;
 ; turn off yellow(gold) player coloring
+; set dreadnaught colors
 ;
 dli1		lda #$00
 		sta grafp0
 		sta grafp1
-		lda #$02
+		lda colorpf1
 		sta wsync
 		sta colpf1
 		lda colorbk
 		sta colbk
 		lda colorpf0
 		sta colpf0
-		lda #$0f
+		lda colorpf2
 		sta colpf2
-		bne dliproc0
+		jmp dliproc0
 
 dli0		lda #$02
 		sta dlino
@@ -544,6 +685,7 @@ dli0		lda #$02
 		sta colpf1
 		lda #$00
 		sta colpf2
+;		sta colbk
 		beq dliproc1
 
 ;------------------------------------------------------------
@@ -557,10 +699,10 @@ initdlist	lda #0
 		sta dlino
 		sta critic
 		
-		mva #$00 color4	;00	backgound
-		mva #$16 color0	;01
+;		mva #$00 color4	;00	backgound
+;		mva #$16 color0	;01
 		mva #$0f color1	;10
-		mva #$00 color2	;11
+;		mva #$00 color2	;11
 		;mva #$18 color3
 
 		lda #$00
@@ -683,13 +825,46 @@ setScreenLines2	dex
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-uploadManta	lda #<mantaShipSprites
+uploadSprites	lda #<mantaShipSprites
 		sta ptr
 		lda #>mantaShipSprites
 		sta ptr+1
 		
 		ldx #0
-uploadManta2	ldy #0
+uploadSprites1	jsr uploadSprite
+		jsr addPtr64
+		inx
+		cpx #46
+		bne uploadSprites1
+		
+		lda #<explosion_major
+		sta ptr
+		lda #>explosion_major
+		sta ptr+1
+		
+uploadSprites2	jsr uploadSprite
+		jsr addPtr64
+		inx
+		cpx #58
+		bne uploadSprites2
+		
+		rts
+
+;------------------------------------------------------------
+;
+;------------------------------------------------------------		
+addPtr64	clc
+		lda ptr
+		adc #64
+		sta ptr
+		bcc addPtr64a
+		inc ptr+1
+addPtr64a	rts
+
+;------------------------------------------------------------
+;
+;------------------------------------------------------------		
+uploadSprite	ldy #0
 		lda #EGO_CMD_SHAPE_DATA
 		sta EGO_REG_CMD
 		stx EGO_REG_DATA				;shape no
@@ -699,21 +874,11 @@ uploadManta2	ldy #0
 		sta EGO_REG_DATA				;shape y lines
 		lda #2				
 		sta EGO_REG_DATA				;shape bpp
-uploadManta3	lda (ptr),y
+uploadSprite1	lda (ptr),y
 		sta EGO_REG_DATA
 		iny
 		cpy #63
-		bne uploadManta3
-		
-		clc
-		lda ptr
-		adc #64
-		sta ptr
-		bcc uploadManta1
-		inc ptr+1
-uploadManta1	inx
-		cpx #46
-		bne uploadManta2
+		bne uploadSprite1
 		rts
 		
 ;------------------------------------------------------------
@@ -757,11 +922,11 @@ char2gfx	lda #EGO_CMD_CHAR_TO_VIDEO
 		sta EGO_REG_CMD
 		
 		clc
-		lda #<dreadnaught
-		adc dreadXPos
+		;lda #<dreadnaught
+		lda dreadXPos
 		sta EGO_REG_DATA
-		lda #>dreadnaught
-		adc dreadXPos+1
+		;lda #>dreadnaught
+		lda dreadXPos+1
 		sta EGO_REG_DATA
 
 		ldx #0
@@ -1237,9 +1402,11 @@ getstart	lda #1
 		
 getstart2	bit consol
 		beq getstart2
+		lda level
+		cmp #14
+		bcs getstart1
 		inc level
-		jsr initLevel
-		
+		jsr initLevel	
 getstart1	rts	
 
 
@@ -1252,9 +1419,10 @@ getselect	lda #2
 		
 getselect2	bit consol
 		beq getselect2
+		lda level
+		beq getselect1
 		dec level
-		jsr initLevel
-		
+		jsr initLevel	
 getselect1	rts	
 
 ;------------------------------------------------------------
@@ -1284,17 +1452,17 @@ time1		dex
 ;
 ;------------------------------------------------------------
 space		lda #0
-		beq PRINT
+		beq print
 		
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-NEWLINE:	lda	#EOL
+newline		lda #EOL
 
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-PRINT:		pha
+print		pha
 		txa
 		pha
 		tya
@@ -1352,30 +1520,26 @@ OUTCH:		ldx dbgpos
 		inc dbgpos
 		rts
 
-mantacnt	.byte 0
-mantaYpos	.byte 68
-mantajfy	.byte 1
+mantaYpos	.byte mantay
+mantaXpos	.byte mantax
+mantajfy	.byte 0
 stickjiffy	.byte 8
 tileColumnCnt	.byte 0
 tileRowCnt	.byte 0
 numberOfTiles	.byte 0
 dreadcolumn	.word 0
 mask		.byte 0
-cnt		.byte 0
 dreadXPos	.word 0
-scrx		.byte 0
-scry		.byte 0
-data		.byte 0
 dlino		.byte 0
-direction	.byte 0
 hscrol		.byte 0
-hspeed		.byte -1
+hspeed		.byte 0
 level		.byte 1
 dbgpos		.byte 0
 turnactive	.byte 0
 turncnt		.byte 0
 pause		.byte 0
-xshadow		.byte 8
+xshadow		.byte 0
+dead		.byte 0
 		
 flipLeftSeq	;.byte 32,33,34,35,36,37,38			;flip 0-6
 		;.byte 17,18,19,20,21,22,23,24,25		;left 1-9
@@ -1387,6 +1551,16 @@ flipRightSeq	;.byte 45,44,43,42,41,40,39			;flip16-7
 		;.byte 9,8,7,6,5,4,3,2,1			;right9-1
 		.byte 1,0,15,14,13,12,11,10,9
 		.byte 39,40,41,42,43,44,45
+		
+explosionSeq	.byte 57,57,57,57,57,56,55,54
+		.byte 53,52,51,50,49,48,47,46
+
+spriteEna	.byte 0, 0, 0, 0, 0, 0, 0, 0
+spriteXpos	.byte 0, 0, 0, 0, 0, 0, 0, 0
+spriteYpos	.byte 0, 0, 0, 0, 0, 0, 0, 0
+spriteShape	.byte 0, 0, 0, 0, 0, 0, 0, 0
+spriteModus	.byte 0, 0, 0, 0, 0, 0, 0, 0
+
 starPosLo
 :17		.byte 0
 starPosHi
@@ -1411,14 +1585,15 @@ tileDataPtrHi
 :160		.byte 0
 
 
-		icl "EgoDemo-Manta.asm"	
+		icl "EgoUridium-Manta.asm"	
+		icl "explosion_sprites.asm"
 		
 titleCharset	ins "main-charset.bin"
 surfaceCharset	ins "surface-common-charset.bin"
 		icl "surface-charset.asm"
 		
-		icl "EgoDemo-GameData.asm"
-		icl "EgoDemo-LevelData.asm"
+		icl "EgoUridium-GameData.asm"
+		icl "EgoUridium-LevelData.asm"
 
 		.align $400
 

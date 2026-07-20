@@ -1,6 +1,6 @@
 @echo off
 
-set RELEASE=EgoTest
+set RELEASE=EgoUridium
 set SOURCE=%RELEASE%.asm
 set TARGET=%RELEASE%.xex
 ..\bin\mads -o:%TARGET% -l -t %SOURCE%
