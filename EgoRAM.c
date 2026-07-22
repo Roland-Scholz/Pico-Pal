@@ -85,6 +85,7 @@ static uint8_t ego_chr2gfx_width;
 static uint8_t ego_chr2gfx_height;
 static uint8_t ego_chr2gfx_scroll;
 static uint8_t ego_chr2gfx_col38;
+static uint8_t ego_char_no;
 
 static shape_t shape_array[EGO_MAX_SHAPES];
 static sprite_t sprite_array[EGO_MAX_SPRITES];
@@ -654,7 +655,10 @@ void __not_in_flash_func(do_data)(uint8_t data)
         break;
     case EGO_ST_CHR2GFX_CHARSET_NO:
         ego_charset_no = data & 0x01;
-        ego_state = EGO_ST_CHR2GFX_SCROLL;
+        if (ego_cmd == EGO_CMD_CHAR)
+            ego_state = EGO_ST_CHAR_NO;
+        else
+            ego_state = EGO_ST_CHR2GFX_SCROLL;
         break;
     case EGO_ST_CHR2GFX_SCROLL:
         ego_chr2gfx_scroll = data & 0x07;
@@ -664,6 +668,17 @@ void __not_in_flash_func(do_data)(uint8_t data)
         ego_chr2gfx_col38 = data;
         ego_state = EGO_ST_IDLE;
         char_to_video();
+        break;
+    case EGO_ST_CHAR_NO:
+        ego_char_no = data;
+        ego_state = EGO_ST_CHAR_DATA;
+        ego_cnt = 0;
+        break;
+    case EGO_ST_CHAR_DATA:
+        charset_array[ego_charset_no][(ego_char_no << 3) + ego_cnt] = data;
+        ego_cnt++;
+        if (ego_cnt >= 8)
+            ego_state = EGO_ST_IDLE;
         break;
     default:
         break;
@@ -735,6 +750,9 @@ void __not_in_flash_func(do_command)(uint8_t data)
         break;
     case EGO_CMD_CHAR_TO_VIDEO:
         ego_state = EGO_ST_CHR2GFX_SRC_LO;
+        break;
+    case EGO_CMD_CHAR:
+        ego_state = EGO_ST_CHR2GFX_CHARSET_NO;
         break;
     case EGO_CMD_MOVEMENT:
         do_movement();

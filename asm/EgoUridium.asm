@@ -9,6 +9,7 @@ ramHiPtr		= ptr+1
 tileDataPtr		= $82
 screenPtr		= $84
 dreadPtr		= $86
+dreadXPos		= $86
 destPtr			= $88
 charSetPtr		= $8a
 temp			= $8c
@@ -18,6 +19,16 @@ colorpf1		= $8f
 colorpf2		= $90
 rndidx			= $91
 cnt			= $92
+firePressed		= $93
+bulletFlag		= $94
+bulletCnt		= $95
+bulletYPos		= $96
+bulletSlotX		= $97
+leftbound		= $98
+rightbound		= $99
+tempX			= $9a
+playerScore		= $9b					;4-byte
+dummy			= $9f
 
 WIDTH			= 40
 WIDTHPIX		= 160
@@ -84,25 +95,21 @@ waitvcnt	lda VCOUNT
 		cmp #104
 		bne waitvcnt
 		
-		lda #10
-		sta colbk
+		sta atract
+
+;		lda #10
+;		sta colbk
 		
 		lda #0
 		sta dbgpos
-		
-;		lda level
-;		jsr puthex
-;		jsr space
-
-;		lda hspeed
-;		jsr puthex
-;		jsr space
-		
-;		lda kbcode
-;		jsr puthex
-;		jsr space
 	
-;		lda xshadow
+;		lda leftbound
+;		jsr puthex
+;		lda rightbound
+;		jsr puthex
+;		lda mantaYpos
+;		jsr puthex
+;		lda bulletYpos
 ;		jsr puthex
 		
 		jsr keyboard
@@ -116,7 +123,7 @@ waitvcnt	lda VCOUNT
 		jsr explosion
 		jmp mainloop2
 		
-mainloop1	jsr scrollSurface
+mainloop1	jsr checkfire
 		jsr collision
 		jsr checkstick
 		jsr updateManta
@@ -126,16 +133,350 @@ mainloop2	;lda #6
 		jsr char2gfx
 		jsr stars2gfx
 		jsr renderSprites		
+		jsr moveBullets
+		jsr scrollSurface
 
 mainpause	jsr getstart
 		jsr getselect
 		jsr getoption
 
-		lda #$00
-		sta colbk
+;		lda #$00
+;		sta colbk
 		jmp mainloop
 
+;-------------------------------------------------------------------
+; 
+;-------------------------------------------------------------------
+checkFire	lda bulletFlag
+		bmi checkFire1
+		beq checkFire3
+		
+		lda #$07
+		sta bulletCnt
+		lda firePressed
+		bne checkFire2
+		sta bulletFlag
+		jsr FireBullets
+checkFire2	rts
+		
+checkFire3	lda firePressed
+		beq checkFire4
+		inc bulletFlag
+		jsr FireBullets
+		rts
+		
+checkFire4	lda bulletCnt
+		bmi checkFire2
+		dec bulletCnt
+		rts
 
+checkFire1	and #$7F
+		sta bulletFlag
+		rts
+	
+;-------------------------------------------------------------------
+; FireBullets
+;-------------------------------------------------------------------
+FireBullets
+		lda bulletFlag
+		ora #$80
+		sta bulletFlag
+		;ldx newSpriteValue
+		;lda levelColorScheme + $01,X
+		;beq FireBulletsEx
+
+		lda mantaYpos					;a33
+		sec
+		sbc #19						;subtract offset so starts at 0
+		sta bulletYPos					;zp0F
+		ldx #$00
+		jsr GetFreeSlotForBullets
+		bcs FireBulletsEx
+		stx bulletSlotX
+		jsr UpdateBulletArrays
+
+		;ldx newSpriteValue
+		;lda bulletColorScheme,X
+		;beq FireBulletsEx
+
+		lda mantaYpos
+		sec
+		sbc #19
+		adc #15
+		sta bulletYPos
+		ldx bulletSlotX
+		jsr GetFreeSlotForBullets
+		bcs FireBulletsEx
+		jsr UpdateBulletArrays
+FireBulletsEx	rts
+
+;-------------------------------------------------------------------
+; GetFreeSlotForBullets
+;-------------------------------------------------------------------
+GetFreeSlotForBullets
+		lda bulletSlot,X
+		beq GetFreeSlotForBulletsEx
+		inx
+		cpx #$06
+		bcc GetFreeSlotForBullets
+		rts
+
+GetFreeSlotForBulletsEx	
+		clc
+		rts
+
+;-------------------------------------------------------------------
+; UpdateBulletArrays
+;-------------------------------------------------------------------
+UpdateBulletArrays
+		
+		lda dreadXPos
+		sta ptr
+		lda bulletYpos
+		lsr
+		lsr
+		and #$fe
+		clc
+		adc dreadXPos+1
+		sta ptr+1		
+	
+		lda #16
+		ldy spriteShape
+		cpy #$19
+		beq UpdateBulletArrays1
+		cpy #$01
+		bne UpdateBulletArraysEx
+		lda #19
+UpdateBulletArrays1
+		adc ptr
+		sta ptr
+		sta bulletPosLo,x
+		lda ptr+1
+		adc #0
+		sta ptr+1
+		sta bulletPosHi,x
+
+		lda bulletYPos
+		and #$07
+		cmp #$07
+		bne UpdateBulletArrays2
+		lda #$06
+UpdateBulletArrays2	
+		sta bulletCharY,x
+		
+		lda #2
+		ldy hspeed
+		bmi UpdateBulletArrays3
+		lda #$fe
+UpdateBulletArrays3		
+		sta bulletSlot,X
+
+		ldy #0
+		lda (ptr),y
+		sta bulletOldChar,x
+
+UpdateBulletArraysEx		
+		rts
+
+
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+moveBullets
+		ldx #5
+		ldy #0
+		sty moveBullets3+1
+moveBullets2	lda bulletSlot,x
+		beq moveBullets1
+		bpl moveBullets4
+		lda #$ff
+		sta moveBullets3+1
+
+moveBullets4	lda bulletPosLo,x
+		sta ptr
+		lda bulletPosHi,x
+		sta ptr+1
+		lda bulletOldChar,x
+		sta (ptr),y
+
+		clc
+		lda bulletSlot,x
+		adc ptr
+		sta ptr
+		sta bulletPosLo,x
+		lda ptr+1
+moveBullets3	adc #0
+		sta ptr+1
+		sta bulletPosHi,x
+		
+		ror
+		lda ptr
+		ror
+		cmp leftbound
+		bcc moveBullets5
+		cmp rightbound
+		bcs moveBullets5
+
+		lda (ptr),y
+		bpl moveBullets6
+		cmp #$90
+		bcc moveBullets5
+		cmp #$A0
+		bcs moveBullets6
+		jsr checkHit
+		jmp moveBullets5
+		
+moveBullets6	sta bulletOldChar,x
+		
+		sty charSetPtr+1
+		asl
+		rol charSetPtr+1
+		asl
+		rol charSetPtr+1
+		asl
+		rol charSetPtr+1
+		clc
+		adc #<surfaceCharset
+		sta charSetPtr
+		lda charSetPtr+1
+		adc #>surfaceCharset
+		sta charSetPtr+1
+		tay
+		bpl moveBullets8
+		ldy level
+		adc charsetArray,y
+		sta charSetPtr+1
+		
+moveBullets8	jsr uploadChar
+		txa
+		sta (ptr),y
+
+moveBullets1	dex
+		bpl moveBullets2
+		rts
+		
+moveBullets5	lda #0
+		sta bulletSlot,x
+		beq moveBullets1
+
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+uploadChar	ldy #0
+		lda bulletCharY,x
+		sta temp
+
+		lda #EGO_CMD_CHAR
+		sta EGO_REG_CMD
+		lda #1
+		sta EGO_REG_DATA
+		stx EGO_REG_DATA
+uploadChar1	cpy temp
+		bne uploadChar2
+		lda #$ff
+		sta EGO_REG_DATA
+		iny
+		lda #$aa
+		bne uploadChar3
+uploadChar2	lda (charSetPtr),y
+uploadChar3	sta EGO_REG_DATA
+		iny
+		cpy #8
+		bcc uploadChar1
+		ldy #0
+		rts
+		
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+checkHit	sec
+		sbc #$90
+		tay
+		lda bulletPosLo,x
+		sbc hitPtrLo,y
+		sta ptr
+		lda bulletPosHi,x
+		sbc hitPtrHi,y
+		sta ptr+1
+
+		lda hitYlen,y
+		sta cnt
+		sta temp
+		
+		lda hitScore,Y
+		tay
+		jsr addScore
+		
+checkHit3	ldy temp
+checkHit1	lda (ptr),y
+		cmp #$20
+		bcc killBullet
+		cmp #$f0
+		bcs checkHit2
+		sec
+		sbc #$20
+		sta (ptr),y	
+checkHit2	dey
+		bpl checkHit1
+		dec cnt
+		bmi checkHitEx
+		inc ptr+1
+		inc ptr+1
+		jmp checkHit3
+
+checkHitEx	ldy #$00
+		rts
+
+killBullet	STX tempX
+		TAX
+		LDA #$00
+		STA bulletSlot,X
+		LDX tempX
+		JMP checkHit2
+		
+;-------------------------------------------------------------------
+; checkHitsFromHittingStuff
+;-------------------------------------------------------------------
+addScore	sed
+		lda scoresToAddArray1,Y
+		clc
+		adc playerScore + $03
+		sta playerScore + $03
+		lda scoresToAddArray2,Y
+		adc playerScore + $02
+		sta playerScore + $02
+		php
+		lda playerScore + $01
+		adc #$00
+		sta playerScore + $01
+		lda playerScore
+		adc #$00
+		sta playerScore
+		bcc addScore1
+		lda #$99
+		sta playerScore
+		sta playerScore + $01
+		sta playerScore + $02
+		sta playerScore + $03
+		plp
+		cld
+		rts
+
+addScore1	plp
+		bcc addScore2
+;		clc
+;		lda currentPlayerLivesLeft
+;		adc #$01
+;		bcs addScore2
+;		sta currentPlayerLivesLeft
+		cld
+		;jsr UpdateLivesLeft
+		;lda #$81
+		;sta a91
+		rts
+
+addScore2   	cld
+		rts
 ;------------------------------------------------------------
 ; keyboard
 ;------------------------------------------------------------
@@ -143,7 +484,9 @@ keyboard	lda kbcode
 		cmp #$21					;space
 		bne keyboardEx
 		lda #0
-		sta hspeed	
+		sta hspeed
+		lda #0
+		sta hscrol
 keyboardEx	rts
 
 ;------------------------------------------------------------
@@ -230,20 +573,10 @@ random3bit	lda random
 ;------------------------------------------------------------
 ; collision
 ;------------------------------------------------------------
-collision	sec
-		lda mantaYpos
-		sbc #20
-		lsr
-		lsr
-		and #$fe
-		tax
+collision	lda nocollision
+		bne collisionEx
 		
-		clc
-		lda dreadXPos
-		sta ptr
-		txa
-		adc dreadXPos+1
-		sta ptr+1
+		jsr getMantaScreen
 
 		ldx #3
 collision2	ldy #18
@@ -269,6 +602,20 @@ collision3	dex
 		
 collisionEx	rts
 
+
+getMantaScreen
+		lda dreadXPos
+		sta ptr
+		sec
+		lda mantaYpos
+		sbc #20
+		lsr
+		lsr
+		and #$fe
+		clc
+		adc dreadXPos+1
+		sta ptr+1
+		rts
 ;------------------------------------------------------------
 ; scrollSurface
 ;------------------------------------------------------------
@@ -304,9 +651,11 @@ decxpos		lda dreadXPos
 		bne decxpos1
 		dec dreadXPos+1
 decxpos1	dec dreadXPos
-		rts
+		jmp incxpos2
 
-
+;
+;
+;
 incxpos		clc
 		lda hscrol
 		adc temp
@@ -332,7 +681,16 @@ incxpos3	and #6
 incxpos1	inc dreadXPos
 		bne incxpos2
 		inc dreadXPos+1
-incxpos2	rts
+
+incxpos2	lda dreadXPos+1
+		ror
+		lda dreadXpos
+		ror
+		sta leftbound
+		clc
+		adc #20
+		sta rightbound		
+		rts
 		
 
 ;------------------------------------------------------------
@@ -461,7 +819,10 @@ renderSprites2	dex
 ;------------------------------------------------------------
 ; joystick input routine
 ;------------------------------------------------------------
-checkstick	;lda stick0
+checkstick	lda trig0
+		eor #$01
+		sta firePressed
+		
 		lda porta
 		lsr
 		bcc stickup
@@ -1529,7 +1890,6 @@ tileRowCnt	.byte 0
 numberOfTiles	.byte 0
 dreadcolumn	.word 0
 mask		.byte 0
-dreadXPos	.word 0
 dlino		.byte 0
 hscrol		.byte 0
 hspeed		.byte 0
@@ -1540,26 +1900,41 @@ turncnt		.byte 0
 pause		.byte 0
 xshadow		.byte 0
 dead		.byte 0
+nocollision	.byte 1
 		
-flipLeftSeq	;.byte 32,33,34,35,36,37,38			;flip 0-6
-		;.byte 17,18,19,20,21,22,23,24,25		;left 1-9
+flipLeftSeq	.byte 25,24,23,22,21,20,19,18,17		;left 1-9
+		.byte 38,37,36,35,34,33,32			;flip 0-6
 		
-		.byte 25,24,23,22,21,20,19,18,17
-		.byte 38,37,36,35,34,33,32
-		
-flipRightSeq	;.byte 45,44,43,42,41,40,39			;flip16-7
-		;.byte 9,8,7,6,5,4,3,2,1			;right9-1
-		.byte 1,0,15,14,13,12,11,10,9
+flipRightSeq	.byte 1,0,15,14,13,12,11,10,9
 		.byte 39,40,41,42,43,44,45
-		
-explosionSeq	.byte 57,57,57,57,57,56,55,54
-		.byte 53,52,51,50,49,48,47,46
+
+; The score are decimal so: 10,24,50,100 etc.
+scoresToAddArray2
+		.byte $00,$00,$00,$00,$01,$01,$02,$05
+		.byte $07,$10,$20,$50
+scoresToAddArray1
+		.byte $00,$10,$25,$50,$00,$50,$50,$00
+		.byte $50,$00,$00,$00
 
 spriteEna	.byte 0, 0, 0, 0, 0, 0, 0, 0
 spriteXpos	.byte 0, 0, 0, 0, 0, 0, 0, 0
 spriteYpos	.byte 0, 0, 0, 0, 0, 0, 0, 0
 spriteShape	.byte 0, 0, 0, 0, 0, 0, 0, 0
 spriteModus	.byte 0, 0, 0, 0, 0, 0, 0, 0
+bulletSlot	.byte 0, 0, 0, 0, 0, 0
+bulletCharY	.byte 0, 0, 0, 0, 0, 0
+bulletPosLo	.byte 0, 0, 0, 0, 0, 0
+bulletPosHi	.byte 0, 0, 0, 0, 0, 0
+bulletOldChar	.byte 0, 0, 0, 0, 0, 0
+
+hitPtrLo	.byte $00,$01,$00,$01,$00,$01,$02,$00
+		.byte $01,$02,$00,$01,$02,$00,$00,$00
+hitPtrHi	.byte $00,$00,$02,$02,$00,$00,$00,$02
+		.byte $02,$02,$04,$04,$04,$00,$00,$00
+hitYlen		.byte $01,$01,$01,$01,$02,$02,$02,$02
+		.byte $02,$02,$02,$02,$02,$00,$00,$00
+hitScore	.byte $02,$02,$02,$02,$02,$00,$00,$00
+		.byte $02,$02,$02,$02,$04,$04,$04,$04
 
 starPosLo
 :17		.byte 0
@@ -1579,6 +1954,11 @@ lineAdrHi	.byte >(gfxmem+4*40+00*320), >(gfxmem+4*40+01*320), >(gfxmem+4*40+02*3
 		.byte >(gfxmem+4*40+12*320), >(gfxmem+4*40+13*320), >(gfxmem+4*40+14*320), >(gfxmem+4*40+15*320)
 		.byte >(gfxmem+4*40+16*320)
 
+lineOffsetLo
+		.byte <(-04*40), <(-03*40), <(-02*40), <(-01*40), <(00*40), <(01*40), <(02*40), <(03*40)
+lineOffsetHi
+		.byte >(-04*40), >(-03*40), >(-02*40), >(-01*40), >(00*40), >(01*40), >(02*40), >(03*40)
+		
 tileDataPtrLo
 :160		.byte 0
 tileDataPtrHi
@@ -1662,6 +2042,4 @@ hor1tab
 :100		.byte 0
 
 		.endp
-	
-	run main
 
