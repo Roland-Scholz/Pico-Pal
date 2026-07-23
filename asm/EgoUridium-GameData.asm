@@ -1,4 +1,67 @@
-;someKindOfTextureData = $E100
+screenWriteJumpTableLoPtr
+        .BYTE <MaybeChangeTitleDecal,<UpdateAndDisplaySomeSprites,<UpdatePlayerScore,<MaybeShowPauseScreen
+        .BYTE <ReturnEarly,<MaybeLaunchMine,<UpdateCurrentColorValue,<MaybeShowPauseScreen
+screenWriteJumpTableHiPtr
+        .BYTE >MaybeChangeTitleDecal,>UpdateAndDisplaySomeSprites,>UpdatePlayerScore,>MaybeShowPauseScreen
+        .BYTE >ReturnEarly,>MaybeLaunchMine,>UpdateCurrentColorValue,>MaybeShowPauseScreen
+
+player1Text
+        .BYTE $00,$01
+        .byte "Player1", $FF
+player2Text
+        .BYTE $00,$1F
+        .byte "Player2", $FF
+oneUpText
+        .BYTE $00,$01
+	.byte $01,$1e,$19,$30,$7A,$7B
+        ;.byte "1up ", $7A, $7B
+livesLeftPlayerOneText
+        .BYTE $30,$03,$FF
+
+livesLeftPlayerTwoText = *+$04
+twoUpText
+        .BYTE $00,$1F
+        ;.byte "", $7A, "", $7B, " 3 2up", $FF, ""
+        .byte $7A, $7B, " 3 2up", $FF
+spaces
+        .BYTE $00,$0F
+        .byte "           ", $FF
+landNowText
+        .BYTE $00,$0F
+        .byte "Land now!", $FF
+	
+arrowKeysSymbol
+        .BYTE $02,$0A,$57,$FF
+globeSymbol
+        .BYTE $02,$0A,$58,$FF
+scrollingTitleScreenDataLoPtrArray   .BYTE $3A,$4B,$5E
+scrollingTitleScreenDataHiPtrArray   .BYTE $35,$35,$35
+
+uridiumDecal
+        .BYTE $02,$0A
+        .BYTE $30,$30,$30,$30,$30,$31,$32,$33
+        .BYTE $34,$35,$36,$37,$38,$39,$7D,$30
+        .BYTE $30,$30,$30,$30,$FF
+hiScoreLabel
+        .BYTE $02,$0A
+	.byte $30,$30,$30,$30,$30
+        ;.BYTE "Hi-score"
+	.byte $41,$12,$2e,$1c,$0c,$18,$1b,$0e
+	.byte $30,$30,$30,$30,$30,$FF
+
+inGameBanner ; $3526
+        .BYTE $02,$0A
+        ;.byte "     12000 AEB   ", $FF
+	.byte $30,$30,$30,$30,$30
+	.byte $01,$02,$00,$00,$00,$30
+	.byte $3a,$3e,$3b
+	.byte $30,$30,$30,$ff
+	
+	.byte "2c    "
+        .byte " ", $55, $55, "     ", $56, $56, $FF, "2c     ", $55, " "
+        .byte "        ", $56, $FF, "2c     ", $55, $55, " "
+        .byte "      ", $56, $FF
+
 tileData
         .BYTE $01,$01,$20
 

@@ -22,6 +22,65 @@ textureDataForLevelHiPtrArray
         .BYTE >level8DreadnoughtData,>level9DreadnoughtData,>level10DreadnoughtData,>level11DreadnoughtData
         .BYTE >level12DreadnoughtData,>level13DreadnoughtData,>level14DreadnoughtData,>level15DreadnoughtData
 	
+levelNameLoPtrArray ;= $E050
+        .BYTE <level1Name,<level2Name,<level3Name,<level4Name,<level5Name,<level6Name,<level7Name
+        .BYTE <level8Name,<level9Name,<level10Name,<level11Name,<level12Name,<level13Name,<level14Name,<level15Name
+levelNameHiPtrArray ;= $E060
+        .BYTE >level1Name,>level2Name,>level3Name,>level4Name,>level5Name,>level6Name,>level7Name
+        .BYTE >level8Name,>level9Name,>level10Name,>level11Name,>level12Name,>level13Name,>level14Name,>level15Name
+level1Name ;= $E070
+        .BYTE $02,$0C
+        .BYTE "    01. Zinc.    ", $FF
+level2Name ;= $E084
+        .BYTE $02,$0C
+;        .BYTE "    02. Lead.    ", $FF
+	.byte $30,$30,$30,$30,$00,$02,$28,$30
+	.byte $45,$0e,$0a,$0d,$28
+	.byte $30,$30,$30,$30,$ff
+level3Name ;= $E098
+        .BYTE $02,$0C
+        .BYTE "   03. Copper.   ", $FF
+level4Name ;= $E0AC
+        .BYTE $02,$0C
+        .BYTE "   04. Silver.   ", $FF
+level5Name ;= $E0C0
+        .BYTE $02,$0C
+        .BYTE "    05. Iron.     ", $FF
+level6Name ;= $E0D5
+        .BYTE $02,$0C
+        .BYTE "    06. Gold.    ", $FF
+level7Name ;= $E0E9
+        .BYTE $02,$0C
+        .BYTE "  07. Platinum. ", $FF
+        .BYTE $00,$FF,$00,$FF
+;*=$8F55
+level8Name ;= $EF55
+        .BYTE $02,$0C
+        .BYTE "  08. Tungsten.  ", $FF
+level9Name ;= $EF69
+        .BYTE $02,$0C
+        .BYTE "   09. Iridon.    ", $FF
+level10Name ;= $EF7E
+        .BYTE $02,$0C
+        .BYTE "  10. Kallisto.  ", $FF
+level11Name ;= $EF92
+        .BYTE $02,$0C
+        .BYTE " 11. Tri-alloy.  ", $FF
+level12Name ;= $EFA6
+        .BYTE $02,$0C
+        .BYTE " 12. Quadmium. ", $FF
+level13Name ;= $EFB8
+        .BYTE $02,$0C
+        .BYTE "  13. Ergonite.  ", $FF
+level14Name ;= $EFCC
+        .BYTE $02,$0C
+        .BYTE " 14. Galactium. ", $FF
+level15Name ;= $EFDF
+        .BYTE $02,$0C
+        .BYTE "  15. Uridium.  ", $FF
+
+        .BYTE $00,$00,$00,$00,$00,$00
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00	
 levelOneDreadnoughtData ;= $F418
         .BYTE $05,$5C,$5C,$06,$06,$06,$06,$5C
         .BYTE $5C,$07,$0C,$08,$08,$08,$08,$08
