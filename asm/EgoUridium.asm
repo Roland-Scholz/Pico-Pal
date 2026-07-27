@@ -64,6 +64,11 @@ dreadnaught		= $C000-$2200
 mathpack		= $d800
 intCharset		= $cc00
 normCharset		= $e000
+player0data		= intCharset
+player1data		= player0data+$100
+player2data		= player1data+$100
+player3data		= player2data+$100
+
 
 titlechars		= dreadnaught-4*40
 titlegfx		= titlechars-4*8*40
@@ -110,10 +115,10 @@ mainloop	lda #112
 		
 		lda #0
 		sta dbgpos
-		lda minePos0
-		jsr puthex
-		lda minePos1
-		jsr puthex
+;		lda dreadXpos+1
+;		jsr puthex
+;		lda dreadXpos
+;		jsr puthex
 		
 		jsr keyboard
 
@@ -376,8 +381,7 @@ checkShaft	lda dreadXPos
 		sta ptr
 		lda dreadXPos+1
 		sta ptr+1
-		
-		
+	
 		ldx #0
 checkShaft2	ldy #39
 		lda (ptr),y
@@ -931,9 +935,9 @@ decxpos2	and #6
 		bne decxpos
 		
 		lda dreadXPos					;check if zero
-		cmp #<(dreadnaught+1)
+		cmp #<(dreadnaught+4)
 		lda dreadXpos+1
-		sbc #>(dreadnaught+1)
+		sbc #>(dreadnaught+4)
 		bcs decxpos
 
 		dec turnactive
@@ -1189,7 +1193,7 @@ initLevel	ldx currentLevel
 		sta colorbk
 		lda levelColorPf0,x
 		sta colorpf0
-		lda #$02
+		lda #$04
 		sta colorpf1
 		lda #$0f
 		sta colorpf2
@@ -1271,23 +1275,14 @@ dliproc1	pla
 ;
 ; turn on yellow(gold) player coloring
 ;
-dli2		;lda #$10
-		;sta colpm0
-		;sta colpm1
-		;lda #$ff
-		;sta grafp0
-		;sta grafp1
-		jmp dliproc0
-		bne dliproc0
+dli2		jmp dliproc0
+		
 
 ;
 ; turn off yellow(gold) player coloring
 ; set dreadnaught colors
 ;
-dli1		;lda #$00
-		;sta grafp0
-		;sta grafp1
-		lda colorpf1
+dli1		lda colorpf1
 		sta wsync
 		sta colpf1
 		lda colorbk
@@ -1323,6 +1318,15 @@ initGame
 		jsr uploadMainCharset
 		
 		ldx #0
+initPdata	lda #$ff
+		sta player0data,x
+		sta player1data,x
+		lda #$00
+		sta player2data,x
+		sta player3data,x
+		inx
+		bne initPdata
+
 filltitle:	lda #$30
 		sta titlechars,x
 		lda #0
@@ -1330,6 +1334,8 @@ filltitle:	lda #$30
 		inx
 		cpx #160
 		bne filltitle
+		
+
 		rts
 		
 ; =================================================================
@@ -1397,66 +1403,49 @@ GenerateRandom1	lda random					; Random Number Generator
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-initdlist	lda #2
-		sta dlino
-		sta dmactl
-		
-		;lda #0						;enable players and missiles
-		;sta sizep0
-
-		lda #$c8					;player data at $cc00
+initdlist	lda #>(player0data-4)				;player data at $cc00
 		sta pmbase
-
-		ldx #0
-initdlist1	lda #$ff
-		sta $cc00,x
-		sta $cd00,x
-		lda #$00
-		sta $ce00,x
-		sta $cf00,x
-		inx
-		bne initdlist1
 		
-		lda #$02					;missile color = colpf3
-		sta prior
-
-		lda #$ff
-		sta sizep0
-		sta sizep1
-
-		lda #$00
-		sta colpm0
-		sta colpm1
+		ldx #$ff
+		stx sizep0
+		stx sizep1
 		
-		lda #<dliproc 
-		sta vdslst
-		lda #>dliproc 
-		sta vdslst+1
-		
-		ldx #0
+		inx						; x=0
+		stx dmactl
 copydlist	lda dl,x
 		sta mathpack,x
 		lda dl+$100,x
 		sta mathpack+$100,x
 		dex
 		bne copydlist
+
+		stx colpm0
+		stx colpm1
+
+		ldx #$02
+		stx dlino
+		stx prior
+		stx gractl
 		
-		lda #2
-		sta gractl
-		lda #20						;first column equals player pos
-		sta hposp0
-		lda #204
-		sta hposp1
+		lda #<dliproc 
+		sta vdslst
+		lda #>dliproc 
+		sta vdslst+1
 
 		lda #<mathpack
 		sta dlistl
 		lda #>mathpack
 		sta dlistl+1
 		
+		lda #20						;first column equals player pos
+		sta hposp0
+		lda #204
+		sta hposp1
+	
 		lda #140
 		jsr waitvcnt
 		
-		lda #32+16+8+2					;DLIST DMA + + Player + normal playfield
+		lda #32+16+8+2					;DLIST DMA + single + Player + normal playfield
 		sta dmactl
 
 		lda #139
