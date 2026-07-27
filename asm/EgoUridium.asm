@@ -39,7 +39,15 @@ decalState		= $a4
 playerAndJoystickMode	= $a5
 monochromEnabled	= $a6
 currentDigitInScore	= $a7
-
+minePos0		= $a8
+minePos1		= $a9
+hspeed			= $aa
+colorp0			= $ab
+colorp1			= $ac
+colorp2			= $ad
+colorp3			= $ae
+p2Ypos			= $af
+p3Ypos			= $b0
 
 WIDTH			= 40
 WIDTHPIX		= 160
@@ -54,6 +62,9 @@ DOWN			= $0f
 
 dreadnaught		= $C000-$2200
 mathpack		= $d800
+intCharset		= $cc00
+normCharset		= $e000
+
 titlechars		= dreadnaught-4*40
 titlegfx		= titlechars-4*8*40
 
@@ -81,24 +92,7 @@ explosion_major46	= 46
 	
 		.proc main
 	
-		jsr copyRomRam
-		jsr GenerateRandomDataFromRNG
-		jsr initdlist
-		jsr convert
-		jsr genTilePtrs
-		jsr setScreenLines
-		jsr uploadSprites
-		jsr uploadMainCharset
-		
-		ldx #0
-filltitle:	lda #$30
-		sta titlechars,x
-		lda #0
-		sta debugScreen,x
-		inx
-		cpx #160
-		bne filltitle
-		
+		jsr initGame		
 
 restart		jsr initLevel
 		jsr UpdateLivesLeft
@@ -106,39 +100,29 @@ restart		jsr initLevel
 ;------------------------------------------------------------
 ; main loop
 ;------------------------------------------------------------
-mainloop	
+mainloop	lda #112
+		jsr waitvcnt
 
-waitvcnt	lda VCOUNT
-		cmp #104+8
-		bne waitvcnt
-		
 		inc rtclok
-
-		sta atract
 
 ;		lda #10
 ;		sta colbk
 		
 		lda #0
 		sta dbgpos
+		lda minePos0
+		jsr puthex
+		lda minePos1
+		jsr puthex
 		
 		jsr keyboard
-		
-		lda pause
-		and #1
-		bne mainpause
 
 		lda dead
 		beq mainloop1
 		jsr explosion
 		jmp mainloop2
 		
-mainloop1	jsr checkfire
-		jsr collision
-		jsr checkstick
-		jsr updateManta
-		
-		lda rtclok
+mainloop1	lda rtclok
 		and #$07
 		tay
 		lda screenWriteJumpTableHiPtr,Y
@@ -154,9 +138,16 @@ mainloop2	jsr char2title
 		jsr stars2gfx
 		jsr renderSprites		
 		jsr moveBullets
+		
+		jsr checkstick
+		jsr checkfire
+		jsr moveShaft
 		jsr scrollSurface
 
-mainpause	jsr getstart
+		jsr collision
+		jsr updateManta		
+		
+		jsr getstart
 		jsr getselect
 		jsr getoption
 
@@ -169,6 +160,15 @@ mainpause	jsr getstart
 ;-------------------------------------------------------------------
 MaybeChangeTitleDecal
 		;rts
+		ldx #1
+ChangeDecal1	clc
+		lda colorp2,x
+		adc #16
+		sta colorp2,x
+		sta colpm2,x
+		dex
+		bpl ChangeDecal1
+		
 		lda rtclok
 		and #$7F
 		bne b231C
@@ -239,116 +239,204 @@ UpdateAndDisplaySomeSprites
 ; UpdatePlayerScore
 ;-------------------------------------------------------------------
 UpdatePlayerScore
-        LDA #$02
-        STA currentCharYPos
+		lda #$02
+		sta currentCharYPos
 xPosForPlayerScoreDisplay =*+$01
-        LDA #$01
-        STA currentCharXPos
-        LDX #$00
-        STX currentDigitInScore
-        LDA #$30
-        STA currentScoreCharToWrite
+		lda #$01
+		sta currentCharXPos
+		ldx #$00
+		stx currentDigitInScore
+		lda #$30
+		sta currentScoreCharToWrite
 
-bB1C4   LDA playerScore,X
-        LSR
-        LSR
-        LSR
-        LSR
-        BNE bB1EF
-        LDA currentScoreCharToWrite
-jB1CE   STA charToWrite
-        JSR WriteCharacterToScreen
-        LDX currentDigitInScore
-        LDA playerScore,X
-        AND #$0F
-        BNE bB1F6
-        CPX #$03
-        BEQ bB1F6
-        LDA currentScoreCharToWrite
-jB1E1   STA charToWrite
-        JSR WriteCharacterToScreen
-        INC currentDigitInScore
-        LDX currentDigitInScore
-        CPX #$04
-        BNE bB1C4
-        RTS
-
-bB1EF   LDY #$00
-        STY currentScoreCharToWrite
-        JMP jB1CE
-
-bB1F6   LDY #$00
-        STY currentScoreCharToWrite
-        JMP jB1E1
-MaybeShowPauseScreen
+bB1C4		lda playerScore,X
+		lsr
+		lsr
+		lsr
+		lsr
+		bne bB1EF
+		lda currentScoreCharToWrite
+jB1CE		sta charToWrite
+		jsr WriteCharacterToScreen
+		ldx currentDigitInScore
+		lda playerScore,X
+		and #$0F
+		bne bB1F6
+		cpx #$03
+		beq bB1F6
+		lda currentScoreCharToWrite
+jB1E1		sta charToWrite
+		jsr WriteCharacterToScreen
+		inc currentDigitInScore
+		ldx currentDigitInScore
+		cpx #$04
+		bne bB1C4
 		rts
+
+bB1EF		ldy #$00
+		sty currentScoreCharToWrite
+		jmp jB1CE
+		
+bB1F6		ldy #$00
+		sty currentScoreCharToWrite
+		jmp jB1E1
+		
+		
+;-------------------------------------------------------------------
+; MaybeShowPauseScreen
+;-------------------------------------------------------------------
+MaybeShowPauseScreen
+		lda pause
+		and #1
+		beq ReturnEarly
+		
+		ldx #<pauseText
+		ldy #>pauseText
+		jsr WriteToScreen
+
+		jsr char2title
+		
+		jsr getoption
+		lda pause
+		and #1
+		bne MaybeShowPauseScreen
+		
+		ldx #<spaces
+		ldy #>spaces
+		jsr WriteToScreen
+
+		;rts
+		
+;--------------------------------------------------------------------
+; ReturnEarly
+;--------------------------------------------------------------------
 ReturnEarly
 		rts
+		
+;--------------------------------------------------------------------
+; MaybeLaunchMine
+;--------------------------------------------------------------------
 MaybeLaunchMine
 		rts
+;--------------------------------------------------------------------
+; UpdateCurrentColorValue
+;--------------------------------------------------------------------
 UpdateCurrentColorValue
 		rts
 
-
-; =================================================================
-; ATARI 800XL: Ultra-optimierte ROM-to-RAM Routine (SMC-Methode)
-; =================================================================
-copyRomRam   	sei          
-		ldy #$00     
-		sty nmien    
+;--------------------------------------------------------------------
+;
+;--------------------------------------------------------------------
+moveShaft	ldx #1
+moveShaft3	lda minePos0,x
+		sta hposp2,x
+		beq moveShaft4
 		
-		; --- startadresse für smc setzen ---
-		lda #$c0      
-		sta sm_rd+2					; high-byte in die lade-anweisung schreiben
-		sta sm_wr+2					; high-byte in die schreib-anweisung schreiben
-	
-page_lp 	
-		; --- schritt 1: rom einblenden & lesen ---
+		clc
+		ldy hspeed
+		bmi movecheckShaft
+
+moveShaftRight	adc hspeed
+		cmp #204
+		bcs moveShaft1
+		bcc moveShaft2
+
+movecheckShaft	adc hspeed
+		cmp #44
+		bcs moveShaft2
+		
+moveShaft1	lda #0
+moveShaft2	sta minePos0,x
+moveShaft4	dex
+		bpl moveShaft3
+
+moveShaftEx	rts
+
+;--------------------------------------------------------------------
+;
+;--------------------------------------------------------------------
+shaftRight	lda #0
+                sta checkShaft2+1
+                lda #48
+                sta checkShaft9+1
+		bne checkShaft
+
+;--------------------------------------------------------------------
+;
+;--------------------------------------------------------------------
+shaftLeft	lda #39
+		sta checkShaft2+1
+		lda #204
+		sta checkShaft9+1
+
+;--------------------------------------------------------------------
+;
+;--------------------------------------------------------------------
+checkShaft	lda dreadXPos
+		sta ptr
+		lda dreadXPos+1
+		sta ptr+1
+		
+		
+		ldx #0
+checkShaft2	ldy #39
+		lda (ptr),y
+;		cmp #$d7
+;		beq checkShaft4
+		cmp #$59					;mine shaft $58-5A
+		bcc checkShaft1
+		cmp #$5b+1
+		bcs checkShaft1
+		
+checkShaft4	ldy #1
+checkShaft6	lda minePos0,y
+		beq checkShaft5
+		dey
+		bpl checkShaft6
+		bmi checkShaft1
+		
+checkShaft5	lda hscrol
+		lsr
+checkShaft9	adc #204
+		sta minePos0,y
+		
+		stx temp
+		txa
+		asl
+		asl
+		asl
+		adc #72
+		tax
+
+		tya
+		adc #$ce
+		sta checkShaft7+2
+		sta checkShaft8+2
+		
+		lda #7
+		sta cnt
+		
+		lda p2Ypos,y
+		stx p2Ypos,y
+		tay
+
+checkShaft3	lda #0
+checkShaft7	sta $ce00,y
 		lda #$ff
-		sta portb    
-	
-sm_rd   	lda $c000,y					; das high-byte ($c0) wird dynamisch modifiziert
-		sta buffer,y 
+checkShaft8	sta $ce00,x
+		inx
 		iny
-		bne sm_rd  
-	
-		; --- schritt 2: ram einblenden & schreiben ---
-		lda #$fe
-		sta portb    
-
-sm_wr1		lda buffer,y 
-sm_wr		sta $c000,y 					; das high-byte ($c0) wird dynamisch modifiziert
-		iny
-		bne sm_wr1 
-	
-		; --- schritt 3: smc-adressen hochzählen ---
-		inc sm_rd+2					; modifiziert direkt das high-byte im befehl oben
-		inc sm_wr+2					; modifiziert direkt das high-byte im befehl oben
-	
-		; --- i/o-bereich überspringen ---
-		lda sm_rd+2
-		cmp #$d0     
-		bne chk_end
-	
-		lda #$d8     
-		sta sm_rd+2   
-		sta sm_wr+2   
-	
-chk_end 	cmp #$00					; fertig bei überlauf von $ff nach $00
-		bne page_lp  
-	
-		;lda #$40     
-		;sta nmien    
-		cli          
-		rts          
-
-; --- variablen-speicher ---
-;rom_mask  	.byte 0
-;ram_mask  	.byte 0
-
-
-
+		dec cnt
+		bpl checkShaft3
+		ldx temp
 		
+checkShaft1	inc ptr+1
+		inc ptr+1
+		inx
+		cpx #17
+		bne checkShaft2
+		
+checkShaftEx	rts
 ;-------------------------------------------------------------------
 ; 
 ;-------------------------------------------------------------------
@@ -856,6 +944,7 @@ decxpos		lda dreadXPos
 		bne decxpos1
 		dec dreadXPos+1
 decxpos1	dec dreadXPos
+		jsr shaftRight
 		jmp incxpos2
 
 ;
@@ -884,10 +973,11 @@ incxpos3	and #6
 		sta turncnt
 		
 incxpos1	inc dreadXPos
-		bne incxpos2
+		bne incxpos4
 		inc dreadXPos+1
+incxpos4	jsr shaftLeft
 
-incxpos2	lda dreadXPos+1
+incxpos2	lda dreadXPos+1					;compute playfield bounds for bullets
 		ror
 		lda dreadXpos
 		ror
@@ -1108,7 +1198,7 @@ initLevel	ldx currentLevel
 		jsr uploadSurfaceCharset
 		jsr drawdread
 
-		ldx #5*8-1
+		ldx #5*8-1					;initialize all sprite data
 		lda #0
 initLevel1	sta spriteEna,x
 		dex
@@ -1119,6 +1209,12 @@ initLevel1	sta spriteEna,x
 		stx hscrol					;X=$00
 		stx turnactive
 		stx dead
+		stx playerScore
+		stx playerScore+1
+		stx playerScore+2
+		stx playerScore+3	
+		stx minePos0
+		stx minePos1
 		inx
 		stx spriteEna					;X=$01
 		stx spriteEna+1
@@ -1148,56 +1244,11 @@ initLevel1	sta spriteEna,x
 		lda #8
 		sta xshadow
 		sta currentPlayerLivesLeft
-		rts
-
-;------------------------------------------------------------
-;
-;------------------------------------------------------------
-uploadMainCharset		
-		lda #<titleCharset
-		ldx #>titleCharset
-		ldy #0					;charsetno
-		jsr uploadCharset
-		jmp uploadCharset1
 		
-uploadSurfaceCharset
-		lda #<surfaceCharset
-		ldx #>surfaceCharset
-		ldy #1
-		jsr uploadCharset
+		lda #10
+		sta colorp2
+		sta colorp3
 		
-		ldx currentLevel
-		clc
-		lda charsetArray,x
-		adc ptr+1
-		sta ptr+1
-		
-;		lda ptr+1
-;		jsr puthex
-;		lda ptr
-;		jsr puthex
-		
-		jmp uploadCharset1
-	
-;------------------------------------------------------------
-;
-;------------------------------------------------------------
-uploadCharset	sta ptr
-		stx ptr+1
-
-		lda #EGO_CMD_CHARSET		
-		sta EGO_REG_CMD				;upload charset
-		sty EGO_REG_DATA			;charset no 0 of 1
-
-uploadCharset1	ldx #4					;upload 1k;
-		ldy #0
-uploadCharset2	lda (ptr),y
-		sta EGO_REG_DATA
-		iny
-		bne uploadCharset2
-		inc ptr+1
-		dex
-		bne uploadCharset2
 		rts
 
 ;------------------------------------------------------------
@@ -1220,21 +1271,22 @@ dliproc1	pla
 ;
 ; turn on yellow(gold) player coloring
 ;
-dli2		lda #$10
-		sta colpm0
-		sta colpm1
-		lda #$ff
-		sta grafp0
-		sta grafp1
+dli2		;lda #$10
+		;sta colpm0
+		;sta colpm1
+		;lda #$ff
+		;sta grafp0
+		;sta grafp1
+		jmp dliproc0
 		bne dliproc0
 
 ;
 ; turn off yellow(gold) player coloring
 ; set dreadnaught colors
 ;
-dli1		lda #$00
-		sta grafp0
-		sta grafp1
+dli1		;lda #$00
+		;sta grafp0
+		;sta grafp1
 		lda colorpf1
 		sta wsync
 		sta colpf1
@@ -1253,50 +1305,128 @@ dli0		lda #$02
 		sta colpf1
 		lda #$00
 		sta colpf2
-;		sta colbk
+		sta colbk
 		beq dliproc1
+
+
+;------------------------------------------------------------
+; main game initialization
+;------------------------------------------------------------
+initGame
+		jsr copyRomRam
+		jsr GenerateRandomDataFromRNG
+		jsr initdlist
+		jsr convert
+		jsr genTilePtrs
+		jsr setScreenLines
+		jsr uploadSprites
+		jsr uploadMainCharset
+		
+		ldx #0
+filltitle:	lda #$30
+		sta titlechars,x
+		lda #0
+		sta debugScreen,x
+		inx
+		cpx #160
+		bne filltitle
+		rts
+		
+; =================================================================
+; ATARI 800XL: Ultra-optimierte ROM-to-RAM Routine (SMC-Methode)
+; =================================================================
+copyRomRam   	sei          
+		ldy #$00     
+		sty nmien    
+		
+		; --- startadresse für smc setzen ---
+		lda #$c0      
+		sta sm_rd+2					; high-byte in die lade-anweisung schreiben
+		sta sm_wr+2					; high-byte in die schreib-anweisung schreiben
+	
+page_lp 	
+		; --- schritt 1: rom einblenden & lesen ---
+		lda #$ff
+		sta portb    
+	
+sm_rd   	lda $c000,y					; das high-byte ($c0) wird dynamisch modifiziert
+		sta buffer,y 
+		iny
+		bne sm_rd  
+	
+		; --- schritt 2: ram einblenden & schreiben ---
+		lda #$fe
+		sta portb    
+
+sm_wr1		lda buffer,y 
+sm_wr		sta $c000,y 					; das high-byte ($c0) wird dynamisch modifiziert
+		iny
+		bne sm_wr1 
+	
+		; --- schritt 3: smc-adressen hochzählen ---
+		inc sm_rd+2					; modifiziert direkt das high-byte im befehl oben
+		inc sm_wr+2					; modifiziert direkt das high-byte im befehl oben
+	
+		; --- i/o-bereich überspringen ---
+		lda sm_rd+2
+		cmp #$d0     
+		bne chk_end
+	
+		lda #$d8     
+		sta sm_rd+2   
+		sta sm_wr+2   
+	
+chk_end 	cmp #$00					; fertig bei überlauf von $ff nach $00
+		bne page_lp  
+
+		cli          
+		rts
+		
+;-------------------------------------------------------------------
+; GenerateRandomDataFromRNG
+;-------------------------------------------------------------------
+GenerateRandomDataFromRNG
+		ldx #$00
+GenerateRandom1	lda random					; Random Number Generator
+		eor randomDataStorage,X
+		sta randomDataStorage,X
+		inx
+		bne GenerateRandom1
+		rts
 
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-initdlist	lda #0
-		sta sdmctl
-		sta dmactl
-		sta nmien
-		
-		lda #2
+initdlist	lda #2
 		sta dlino
-		sta critic
+		sta dmactl
 		
-;		mva #$00 color4	;00	backgound
-;		mva #$16 color0	;01
-		mva #$0f color1	;10
-;		mva #$00 color2	;11
-		;mva #$18 color3
+		;lda #0						;enable players and missiles
+		;sta sizep0
+
+		lda #$c8					;player data at $cc00
+		sta pmbase
+
+		ldx #0
+initdlist1	lda #$ff
+		sta $cc00,x
+		sta $cd00,x
+		lda #$00
+		sta $ce00,x
+		sta $cf00,x
+		inx
+		bne initdlist1
+		
+		lda #$02					;missile color = colpf3
+		sta prior
+
+		lda #$ff
+		sta sizep0
+		sta sizep1
 
 		lda #$00
-		sta pcolor0
-		sta pcolor1
-		
-		lda #3						;enable players and missiles
-		sta sizep0
-		
-		lda #8
-		sta gprior
-		
-		lda #$ff
-		sta grafp0
-		sta grafp1
-		sta grafp2
-		sta grafp3
-		
-		lda #108
-		sta hposp0
-		lda #140
-		sta hposp1
-		
-waitvbi		lda vcount
-		bne waitvbi
+		sta colpm0
+		sta colpm1
 		
 		lda #<dliproc 
 		sta vdslst
@@ -1311,19 +1441,228 @@ copydlist	lda dl,x
 		dex
 		bne copydlist
 		
+		lda #2
+		sta gractl
+		lda #20						;first column equals player pos
+		sta hposp0
+		lda #204
+		sta hposp1
+
 		lda #<mathpack
 		sta dlistl
-		sta sdlstl
 		lda #>mathpack
 		sta dlistl+1
-		sta sdlstl+1
 		
-		lda #192
-		sta nmien
+		lda #140
+		jsr waitvcnt
 		
-		lda #32+2
-		sta sdmctl
+		lda #32+16+8+2					;DLIST DMA + + Player + normal playfield
 		sta dmactl
+
+		lda #139
+		jsr waitvcnt
+
+		lda #128					;allow only DLI
+		sta nmien
+		rts
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+waitvcnt	cmp vcount
+		bne waitvcnt
+		rts
+;------------------------------------------------------------
+; convert 4kb charsets 
+; "00" -> "01"
+; "11" -> "00"
+;------------------------------------------------------------
+convert		ldx #16						;16 pages = 4kb
+		ldy #0
+		lda #<surfaceCharset
+		sta ptr
+		lda #>surfaceCharset
+		sta ptr+1
+		
+convert1	lda #$c0
+		sta mask
+		
+convert2	lda (ptr),y
+		and mask
+		bne convert3
+		lda (ptr),y					;"00" case -> "11"
+		ora mask
+		sta (ptr),y
+		jmp convert4
+convert3	cmp mask				
+		bne convert4
+		eor #$ff					;"11" case -> "00"
+		and (ptr),y
+		sta (ptr),y
+		
+convert4	lsr mask
+		lsr mask
+		bne convert2
+		
+		iny
+		bne convert1		
+		inc ptr+1
+		dex
+		bne convert1
+		rts
+
+;------------------------------------------------------------
+; generate tileDataPtrs
+;------------------------------------------------------------
+genTilePtrs	ldy #0
+		ldx #1
+		
+		lda #<tileData
+		sta tileDataPtr
+		lda #>tileData
+		sta tileDataPtr+1
+		bne genTilePtrs6
+
+genTilePtrs4	lda (tileDataPtr),y				;load tile's number of columns 
+		beq genTilePtrs3				;if zero exit
+		sta tileColumnCnt
+
+		inc tileDataPtr
+		bne genTilePtrs2
+		inc tileDataPtr+1
+
+genTilePtrs2	lda (tileDataPtr),y				;load number of rows
+		sec
+		adc tileDataPtr
+		sta tileDataPtr
+		bcc genTilePtrs1
+		inc tileDataPtr+1
+genTilePtrs1	dec tileColumnCnt
+		bne genTilePtrs2
+		
+genTilePtrs6	lda tileDataPtr
+		sta tileDataPtrLo,x
+		lda tileDataPtr+1
+		sta tileDataPtrHi,x
+
+		inx
+		jmp genTilePtrs4
+		
+genTilePtrs3	stx numberOfTiles		
+		rts
+
+;------------------------------------------------------------
+; set line addresses and blitwidth/heigt (40 / 136)
+;------------------------------------------------------------
+setScreenLines	lda #EGO_CMD_SET_BLIT_WIDTH	
+		sta EGO_REG_CMD
+		lda #40						;BLITWIDTH
+		sta EGO_REG_DATA
+		
+		lda #EGO_CMD_SET_BLIT_HEIGHT
+		sta EGO_REG_CMD
+		lda #136			
+		sta EGO_REG_DATA
+
+
+		lda #<gfxmem
+		sta ptr
+		lda #>gfxmem
+		sta ptr+1
+		
+		lda #EGO_CMD_ABORT
+		sta EGO_REG_CMD
+		
+		lda #EGO_CMD_LINE_PTR
+		sta EGO_REG_CMD
+		ldx #136
+		stx EGO_REG_DATA
+		
+setScreenLines1	lda ptr
+		sta EGO_REG_DATA
+		lda ptr+1
+		sta EGO_REG_DATA
+		
+		clc
+		lda ptr
+		adc #40
+		sta ptr
+		bcc setScreenLines2
+		inc ptr+1
+		
+setScreenLines2	dex
+		bne setScreenLines1
+		rts		
+		
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+uploadSprites	lda #<mantaShipSprites
+		sta ptr
+		lda #>mantaShipSprites
+		sta ptr+1
+		
+		ldx #0
+uploadSprites1	jsr uploadSprite
+		jsr addPtr64
+		inx
+		cpx #46
+		bne uploadSprites1
+		
+		lda #<explosion_major
+		sta ptr
+		lda #>explosion_major
+		sta ptr+1
+		
+uploadSprites2	jsr uploadSprite
+		jsr addPtr64
+		inx
+		cpx #58
+		bne uploadSprites2
+		
+		rts
+
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+uploadMainCharset		
+		lda #<titleCharset
+		ldx #>titleCharset
+		ldy #0					;charsetno 0
+		jsr uploadCharset
+		jmp uploadCharset1
+		
+uploadSurfaceCharset
+		lda #<surfaceCharset
+		ldx #>surfaceCharset
+		ldy #1					;charsetno 1
+		jsr uploadCharset
+		
+		ldx currentLevel
+		clc
+		lda charsetArray,x
+		adc ptr+1
+		sta ptr+1		
+		jmp uploadCharset1
+	
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+uploadCharset	sta ptr
+		stx ptr+1
+
+		lda #EGO_CMD_CHARSET		
+		sta EGO_REG_CMD				;upload charset
+		sty EGO_REG_DATA			;charset no 0 of 1
+
+uploadCharset1	ldx #4					;upload 1k;
+		ldy #0
+uploadCharset2	lda (ptr),y
+		sta EGO_REG_DATA
+		iny
+		bne uploadCharset2
+		inc ptr+1
+		dex
+		bne uploadCharset2
 		rts
 
 ;-------------------------------------------------------------------
@@ -1454,79 +1793,6 @@ WriteCharacterToScreen
 WriteCharacterToScreenEx		
 		rts
 		
-		
-;------------------------------------------------------------
-; set line addresses and blitwidth/heigt (40 / 136)
-;------------------------------------------------------------
-setScreenLines	lda #EGO_CMD_SET_BLIT_WIDTH	
-		sta EGO_REG_CMD
-		lda #40						;BLITWIDTH
-		sta EGO_REG_DATA
-		
-		lda #EGO_CMD_SET_BLIT_HEIGHT
-		sta EGO_REG_CMD
-		lda #136			
-		sta EGO_REG_DATA
-
-
-		lda #<gfxmem
-		sta ptr
-		lda #>gfxmem
-		sta ptr+1
-		
-		lda #EGO_CMD_ABORT
-		sta EGO_REG_CMD
-		
-		lda #EGO_CMD_LINE_PTR
-		sta EGO_REG_CMD
-		ldx #136
-		stx EGO_REG_DATA
-		
-setScreenLines1	lda ptr
-		sta EGO_REG_DATA
-		lda ptr+1
-		sta EGO_REG_DATA
-		
-		clc
-		lda ptr
-		adc #40
-		sta ptr
-		bcc setScreenLines2
-		inc ptr+1
-		
-setScreenLines2	dex
-		bne setScreenLines1
-		
-		rts
-		
-;------------------------------------------------------------
-;
-;------------------------------------------------------------
-uploadSprites	lda #<mantaShipSprites
-		sta ptr
-		lda #>mantaShipSprites
-		sta ptr+1
-		
-		ldx #0
-uploadSprites1	jsr uploadSprite
-		jsr addPtr64
-		inx
-		cpx #46
-		bne uploadSprites1
-		
-		lda #<explosion_major
-		sta ptr
-		lda #>explosion_major
-		sta ptr+1
-		
-uploadSprites2	jsr uploadSprite
-		jsr addPtr64
-		inx
-		cpx #58
-		bne uploadSprites2
-		
-		rts
-
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------		
@@ -1629,51 +1895,14 @@ char2gfx	lda #EGO_CMD_CHAR_TO_VIDEO
 		sta EGO_REG_DATA				;charset 0
 		lda hscrol
 		sta EGO_REG_DATA				;scroll
-		sty EGO_REG_DATA				;col38 = true
+		lda #0
+		sta EGO_REG_DATA				;col38 = true
 		;rts
 		
 waitstatus	lda EGO_REG_STATUS
 		bmi waitstatus
 		rts
-					
-;------------------------------------------------------------
-;
-;------------------------------------------------------------
-convert		ldx #16						;16 pages = 4kb
-		ldy #0
-		lda #<surfaceCharset
-		sta ptr
-		lda #>surfaceCharset
-		sta ptr+1
-		
-convert1	lda #$c0
-		sta mask
-		
-convert2	lda (ptr),y
-		and mask
-		bne convert3
-		lda (ptr),y					;"00" case -> "11"
-		ora mask
-		sta (ptr),y
-		jmp convert4
-convert3	cmp mask				
-		bne convert4
-		eor #$ff					;"11" case -> "00"
-		and (ptr),y
-		sta (ptr),y
-		
-convert4	lsr mask
-		lsr mask
-		bne convert2
-		
-		iny
-		bne convert1		
-		inc ptr+1
-		dex
-		bne convert1
-		rts
-		
-		
+
 ;------------------------------------------------------------
 ; draw dreadnaught
 ;------------------------------------------------------------
@@ -1882,48 +2111,6 @@ sub513		sec
 		sbc #>513
 		sta screenPtr+1
 		rts
-		
-firstline	.word dreadnaught+16*512
-
-;------------------------------------------------------------
-; generate tileDataPtrs
-;------------------------------------------------------------
-genTilePtrs	ldy #0
-		ldx #1
-		
-		lda #<tileData
-		sta tileDataPtr
-		lda #>tileData
-		sta tileDataPtr+1
-		bne genTilePtrs6
-
-genTilePtrs4	lda (tileDataPtr),y				;load tile's number of columns 
-		beq genTilePtrs3				;if zero exit
-		sta tileColumnCnt
-
-		inc tileDataPtr
-		bne genTilePtrs2
-		inc tileDataPtr+1
-
-genTilePtrs2	lda (tileDataPtr),y				;load number of rows
-		sec
-		adc tileDataPtr
-		sta tileDataPtr
-		bcc genTilePtrs1
-		inc tileDataPtr+1
-genTilePtrs1	dec tileColumnCnt
-		bne genTilePtrs2
-		
-genTilePtrs6	lda tileDataPtr
-		sta tileDataPtrLo,x
-		lda tileDataPtr+1
-		sta tileDataPtrHi,x
-
-		inx
-		jmp genTilePtrs4
-		
-genTilePtrs3	stx numberOfTiles		
-		rts
 
 ;-------------------------------------------------------------------
 ; stars2gfx
@@ -2056,18 +2243,6 @@ genstars7	clc
 ;		cpy #17
 ;		bne genstars9
 		rts
-
-;-------------------------------------------------------------------
-; GenerateRandomDataFromRNG
-;-------------------------------------------------------------------
-GenerateRandomDataFromRNG
-		ldx #$00
-GenerateRandom1	lda random					; Random Number Generator
-		eor randomDataStorage,X
-		sta randomDataStorage,X
-		inx
-		bne GenerateRandom1
-		rts
 		
 ;------------------------------------------------------------
 ;
@@ -2109,7 +2284,7 @@ getoption	lda #4
 		bne getoption1
 
 		inc pause
-		
+
 getoption2	bit consol
 		beq getoption2
 		
@@ -2207,7 +2382,6 @@ dreadcolumn	.word 0
 mask		.byte 0
 dlino		.byte 0
 hscrol		.byte 0
-hspeed		.byte 0
 currentLevel	.byte 1
 dbgpos		.byte 0
 turnactive	.byte 0
@@ -2258,6 +2432,8 @@ starPosHi
 starThick
 :17		.byte 0
 
+firstline	.word dreadnaught+16*512
+
 lineAdrLo	.byte <(gfxmem+4*40+00*320), <(gfxmem+4*40+01*320), <(gfxmem+4*40+02*320), <(gfxmem+4*40+03*320)
 		.byte <(gfxmem+4*40+04*320), <(gfxmem+4*40+05*320), <(gfxmem+4*40+06*320), <(gfxmem+4*40+07*320)
 		.byte <(gfxmem+4*40+08*320), <(gfxmem+4*40+09*320), <(gfxmem+4*40+10*320), <(gfxmem+4*40+11*320)
@@ -2293,11 +2469,8 @@ surfaceCharset	ins "surface-common-charset.bin"
 		icl "EgoUridium-GameData.asm"
 		icl "EgoUridium-LevelData.asm"
 
-		;.align $400
+dc		= $0e
 
-;		.local dl
-		dc = $0e+$00
-	
 dl		.byte $70,$70
 		.byte $40+$0f
 		.word titlegfx
@@ -2306,15 +2479,9 @@ dl		.byte $70,$70
 :7		.byte $0f
 		.byte $0f+$80
 
-;		.byte $70,$70
 		.byte $40+dc
 		.word gfxtop
 :15		.byte dc
-
-;.rept 136
-;		.byte $40+dc
-;		.word gfxmem + (# * 40)
-;.endr
 
 		.byte $40+dc
 		.word gfxmem
@@ -2334,31 +2501,9 @@ text:		.word debugScreen
 		.byte 2
 		.byte $41
 		.word mathpack
-		
-;		.endl
 
 gfxtop		= $da00
 gfxbottom	= gfxtop + $280
-
-titlescr
-		.byte $01,$01,$1e,$19,$30,$7a,$7b,$30,$03,$30,$30,$30,$30,$30,$30,$30
-		.byte $30,$49,$69,$0a,$1e,$1c,$0e,$30,$30,$30,$30,$30,$30,$30,$30,$7a  
-		.byte $7b,$30,$03,$30,$02,$1e,$19,$30
-
-		.byte $30,$81,$9e,$99,$b0,$fa,$fb,$b0
-		.byte $83,$30,$30,$30,$30,$30,$30,$b0,$b0,$c9,$e9,$8a,$9e,$9c,$8e,$b0
-		.byte $b0,$b0,$30,$30,$30,$30,$30,$fa,$fb,$b0,$83,$b0,$82,$9e,$99,$30
-
-		;      1234567890123456789012345678901234567890
-		.byte "                                        "
-		.byte "                                        "
-;		dta c"000000000000000123456789"
-;		.byte $7d
-;		dta c"                "
-
-;		dta c"              "
-;		.byte $b1,$b2,$b3,$b4,$b5,$b6,$b7,$b8,$b9,$fd
-;		dta c"                "
 
 ;		org $349F
 ;f349F   .BYTE $4E,$1B,$12,$0D,$12,$1E,$42,$30

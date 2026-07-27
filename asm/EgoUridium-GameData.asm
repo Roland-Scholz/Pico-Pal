@@ -25,10 +25,17 @@ twoUpText
         .byte $7A, $7B, " 3 2up", $FF
 spaces
         .BYTE $00,$0F
-        .byte "           ", $FF
+	.byte $30,$30,$30,$30,$30,$30,$30,$30,$30,$30,$30,$ff
+;        .byte "           ", $FF
 landNowText
         .BYTE $00,$0F
-        .byte "Land now!", $FF
+        ;.byte "Land now!", $FF
+	.byte $45,$0a,$17,$0d,$30,$17,$18,$54,$25,$ff
+
+pauseText
+        .BYTE $00,$0F
+;        .BYTE "  Pause   ", $FF
+	.byte $30,$30,$49,$0a,$1e,$1c,$0e,$30,$30,$30,$ff
 	
 arrowKeysSymbol
         .BYTE $02,$0A,$57,$FF

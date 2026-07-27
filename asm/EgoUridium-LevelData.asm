@@ -30,7 +30,9 @@ levelNameHiPtrArray ;= $E060
         .BYTE >level8Name,>level9Name,>level10Name,>level11Name,>level12Name,>level13Name,>level14Name,>level15Name
 level1Name ;= $E070
         .BYTE $02,$0C
-        .BYTE "    01. Zinc.    ", $FF
+        ;.BYTE "    01. Zinc.    ", $FF
+	.byte $30,$30,$30,$30,$53,$12,$17,$0c,$28,$30,$30,$30,$30,$30,$ff
+	
 level2Name ;= $E084
         .BYTE $02,$0C
 ;        .BYTE "    02. Lead.    ", $FF
