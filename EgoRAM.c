@@ -89,7 +89,7 @@ static uint8_t ego_char_no;
 
 static shape_t shape_array[EGO_MAX_SHAPES];
 static sprite_t sprite_array[EGO_MAX_SPRITES];
-static uint8_t charset_array[2][2048];
+static uint8_t *charset_array[256];
 
 static PIO pio = pio0;
 
@@ -600,7 +600,11 @@ void __not_in_flash_func(do_data)(uint8_t data)
         ego_state = EGO_ST_IDLE;
         break;
     case EGO_ST_CHARSET_NO:
-        ego_charset_no = data & 0x01;
+        ego_charset_no = data;
+        if (charset_array[ego_charset_no] == NULL)
+        {
+            charset_array[ego_charset_no] = malloc(2048);
+        }
         ego_state = EGO_ST_CHARSET_DATA;
         ego_cnt = 0;
         break;

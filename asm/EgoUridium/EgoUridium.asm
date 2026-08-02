@@ -1,11 +1,220 @@
+;------------------------------------------------------------
+; C64 memory layout
+;
+; $4000 - $47ff sprites $00-$1f (dropship $00-$0b, $0c-$1f explosions)
+; $4800 - $4be8 screen data
+; $4bf8 - $4bff sprite pointer
+; $4c00 - $5000 sprites $30-$3f explosions-major
+; $5000 - $5c00 sprites $40-$6f Manta
+; $5c00 - $67ff sprites $70-$9f Manta shadow
+; $6800 - $6fff sprites $a0-$bf meanies
+;------------------------------------------------------------
 
 	icl "System-Equates.asm"
 	icl "EgoRAM-Equates.asm"
 	icl "EgoUridium-Constants.asm"
-	
-ptr			= $80
-ramLoPtr		= ptr
-ramHiPtr		= ptr+1
+
+SCREEN_RAM_HIBANK = $4800
+sprite0Ptr = SCREEN_RAM_HIBANK + $03F8
+SURFACETEXTURECHARACTERSET = $CAFE				;to do!!!
+
+playerScore = $20
+indexCurrentEnemyFormation = $24
+enemyMovementStrategyLoPtr = $70
+enemyMovementStrategyHiPtr = $71
+a9C = $9C
+aA4 = $A4
+aC0 = $C0
+aC1 = $C1
+aC2 = $C2
+aC3 = $C3
+aC4 = $C4
+aC5 = $C5
+aC6 = $C6
+aC7 = $C7
+aC8 = $C8
+aC9 = $C9
+aCA = $CA
+aCB = $CB
+aCC = $CC
+aCD = $CD
+aCE = $CE
+aF3 = $F3
+aF6 = $F6
+aF9 = $F9
+;
+; **** ZP ABSOLUTE ADRESSES ****
+;
+SPACE = $20
+RAM_ACCESS_MODE = $01
+currentSpriteMSB = $02
+spriteMixerValue = $03
+spriteIndex = $04
+currentSpriteXPos = $05
+currentSpriteMSBXPosOffset = $06
+currentSpriteYPos = $07
+currentSpriteDisplayEnable = $08
+currentSpriteExpandVertical = $09
+currentSpriteBackgroundDisplayPriority = $0A
+currentSpriteMultiColorMode = $0B
+currentSpriteExpandHorizontal = $0C
+currentSpriteColor = $0D
+currentSpriteValue = $0E
+secondHalfOfMap = a0F
+a0F = $0F
+dataIndex = $10
+stashedYValue = $11
+colorRamHiPtr = $13
+someDataLoPtr = $14
+someDataHiPtr = $15
+leftPressed = $16
+rightPressed = $17
+firePressed = $18
+bitMapForPlayerVolumeAndColor = $19
+srcLoPtr = $1A
+srcHiPtr = $1B
+ramLoPtr = $1C
+ramHiPtr = $1D
+a1F = $1F
+currentPlayerLivesLeft = $25
+indexToCurrentLevelTextureData = $26
+currentLevel = $27
+selectForBulletsOrMines = $28
+positionInsideScrollSegment = $29
+currentScrollSegment = $2A
+frameRateBeforePause = $2B
+pixelsToScroll = $2C
+a2D = $2D
+mantaDirectionAndSpeed = $2E
+shouldWaitUntilReady = $2F
+scrollPositionHiPtr = $30
+scrollPositionLoPtr = $31
+hasShipBeenHit = $32
+mantaCurrentYPos = $33
+a34 = $34
+a35 = $35
+a36 = $36
+a37 = $37
+a38 = $38
+a39 = $39
+a3A = $3A
+a3B = $3B
+a3C = $3C
+mantaShadowOffset = $3D
+a3E = $3E
+a3F = $3F
+newSpriteValue = $40
+mantaShadowSpriteValue = $41
+mantaAnimationLoPtr = $42
+mantaAnimationHiPtr = $43
+framesInAnimation = $44
+a45 = $45
+a46 = $46
+a47 = $47
+fireButtonDebounce = $48
+buttonPressDebounce = $49
+currentBackgroundColor = $4A
+backgroundColor2 = $4B
+backgroundColor1 = $4C
+loadedCharacterColor = $4D
+multiColor0 = $4E
+spriteColorForLevel = $4F
+mantaBottomCannonLoPtr = $50
+mantaBottomCannonHiPtr = $51
+mantaTopCannonLoPtr = $52
+mantaTopCannonHiPtr = $53
+someKindOfTextureColorVariable = $54
+currentColorValue = $55
+a56 = $56
+a57 = $57
+monochromeCharacterColor = $58
+loopCounter = $59
+pausedOrNotPaused = $5A
+a5B = $5B
+playerAndJoystickMode = $5C
+currentPlayer = $5D
+fakeLeftPressed = $5E
+fakeRightPressed = $5F
+pausePressed = $60
+monochromEnabled = $61
+someKindOfFrameRate = $62
+enemyXPosBackwardVelocity = $63
+enemyXPosBackwardIncrement = $64
+enemyBulletXPosAnimationRate = $65
+enemyXPosForwardVelocity = $66
+enemyXPosForwardIncrement = $67
+whetherScoreAwardedForHittingEnemy = $68
+whetherToFireEnemyBulletOrMine = $69
+bulletSpriteCurrentLevel = $6A
+enemyBulletXPosIncrement = $6B
+usedToCheckIfWeShouldLaunchMine = $6C
+loPtrToEnemyFormationOrder = $6D
+hiPtrToEnemyFormationOrder = $6E
+currentEnemyMovementStrategy = $6F
+durationOfStrategyForFormation = $7C
+durationOfStrategyForNextEnemyInFormation = $7D
+currentEnemySpriteValue = $7E
+scoreToAddForHittingEnemy = $7F
+enemyYPosUpwardVelocity = $80
+enemyYPosUpwardIncrement = $81
+enemyYPosDownwardVelocity = $82
+enemyYPosDownwardIncrement = $83
+initialEnemyXPos = $84
+landNowActivated = $85
+a86 = $86
+formationAnnihilationBonus = $87
+numberOfEnemiesSpawned = $88
+destroyedEdgeLoPtr = $89
+destroyedEdgeHiPtr = $8A
+indexToTextureSegment = $8D
+fakeFirePressed = $8E
+initialValueOfY = $8F
+soundOrTitleSelector = $90
+soundVariable1 = $91
+soundVariable2 = $92
+soundVariable3 = $93
+a94 = $94
+a95 = $95
+a96 = $96
+a97 = $97
+a98 = $98
+a99 = $99
+a9D = $9D
+a9F = $9F
+aA0 = $A0
+soundPtr = $A1
+aA2 = $A2
+aA3 = $A3
+aA7 = $A7
+aA8 = $A8
+aA9 = $A9
+aAA = $AA
+MANTA_HORIZONTAL_POSITION = $AA
+anotherRandomNumberBetween0and1 = $AB
+randomNumberBetween0and1 = $AC
+shipDestructBonus = $AD
+miniGameUpdateRate = $AE
+tempLoPtrCopyTo = $B0
+tempHiPtrCopyTo = $B1
+tempLoPtrCopyFrom = $B2
+tempHiPtrCopyFrom = $B3
+currentCharYPos = $B4
+currentCharXPos = $B5
+charToWrite = $B6
+aB7 = $B7
+aB8 = $B8
+aBA = $BA
+aBB = $BB
+aBC = $BC
+dataHiPtr = $BF
+aEF = $EF
+aF0 = $F0
+aF1 = $F1
+aF2 = $F2
+aFB = $FB
+aFC = $FC
+
+ptr			= ramLoPtr
 
 tileDataPtr		= $82
 screenPtr		= $84
@@ -21,7 +230,6 @@ colorpf1		= $8f
 colorpf2		= $90
 rndidx			= $91
 cnt			= $92
-firePressed		= $93
 bulletFlag		= $94
 bulletCnt		= $95
 bulletYPos		= $96
@@ -29,25 +237,20 @@ bulletSlotX		= $97
 leftbound		= $98
 rightbound		= $99
 tempX			= $9a
-playerScore		= $9b					;4-byte
-currentCharXPos		= $9f
-currentCharYPos		= $a0
-charToWrite		= $a1
-currentPlayer		= $a2
-currentPlayerLivesLeft	= $a3
 decalState		= $a4
-playerAndJoystickMode	= $a5
-monochromEnabled	= $a6
 currentDigitInScore	= $a7
 minePos0		= $a8
 minePos1		= $a9
 hspeed			= $aa
-colorp0			= $ab
-colorp1			= $ac
-colorp2			= $ad
-colorp3			= $ae
-p2Ypos			= $af
-p3Ypos			= $b0
+
+p0Ypos			= $c0
+p1Ypos			= $c1
+p2Ypos			= $c2
+p3Ypos			= $c3
+colorp0			= $c4
+colorp1			= $c5
+colorp2			= $c6
+colorp3			= $c7
 
 WIDTH			= 40
 WIDTHPIX		= 160
@@ -60,7 +263,9 @@ RIGHT			= $07
 UP			= $0e
 DOWN			= $0f
 
-dreadnaught		= $C000-$2200
+dreadnaught		= $C000-$2200		;= $9E00
+SURFACEDATAFORCURRENTLEVEL = dreadnaught
+
 mathpack		= $d800
 intCharset		= $cc00
 normCharset		= $e000
@@ -74,7 +279,6 @@ titlechars		= dreadnaught-4*40
 titlegfx		= titlechars-4*8*40
 
 gfxmem			= $8010
-SCREEN_RAM_HIBANK	= gfxmem
 
 mantax			= 84
 mantay			= 68
@@ -82,6 +286,7 @@ mantay			= 68
 debugScreen		= $0600
 randomDataStorage 	= $0700
 buffer			= $0600
+nmivkt			= $fffa
 
 explosion_major46	= 46
 
@@ -102,6 +307,824 @@ explosion_major46	= 46
 restart		jsr initLevel
 		jsr UpdateLivesLeft
 
+
+;--------------------------------------------------------------------
+; MainGameLoop
+;--------------------------------------------------------------------
+MainGameLoop
+        ;LDA shouldWaitUntilReady
+        ;BNE MainGameLoop
+	
+	lda #112
+	jsr waitvcnt
+	
+        JSR AnimatePlayerBullet
+        JSR UpdateScrollPositionUsingDirectionAndSpeed
+        JSR ScrollShipSurface
+;        JSR AddStarsBehindDreadnought
+;        JSR UpdateColorsOnScreen
+;        JSR UpdateEnemies
+        INC someKindOfFrameRate
+;        JSR GetJoystickInput
+
+        ; Perform one of seven functions at each loop.
+        LDA someKindOfFrameRate
+        AND #$07
+        TAY
+        LDA mainLoopJumpTableHiPtr,Y
+        STA mymainGameLoopHiPtr
+        LDA mainLoopJumpTableLoPtr,Y
+        STA mymainGameLoopLoPtr
+mymainGameLoopLoPtr   =*+$01
+mymainGameLoopHiPtr   =*+$02
+        JSR MaybeChangeTitleDecal
+
+        JSR MaybeFirePlayerBullets
+        ;JSR MaybeMoveLeft
+        ;JSR MaybeMoveRight
+        ;JSR UpdateABunchOfGameVariables
+        ;JSR AnimateMantaShip
+        ;JSR CheckLandNowWarning
+        LDA landNowActivated
+        BPL b0D41
+        ;JMP StartLandingSequence
+
+b0D41   LDA hasShipBeenHit
+        BEQ MainGameLoop
+	
+;--------------------------------------------------------------------
+; DoNothing
+;--------------------------------------------------------------------
+DoNothing
+        RTS
+
+;-------------------------------------------------------------------
+; AnimatePlayerBullet
+;-------------------------------------------------------------------
+AnimatePlayerBullet
+        LDY #$00
+        LDX #$05
+EraseBulletsLoop  
+        LDA playerBulletSlotArray,X
+        BEQ SkipB
+        LDA playerBulletRamLoPtrArray,X
+        STA ramLoPtr
+        LDA playerBulletRamHiPtrArray,X
+        STA ramHiPtr
+        LDA charBehindPlayerBulletArray,X
+        STA (ramLoPtr),Y
+SkipB   DEX
+        BPL EraseBulletsLoop
+
+        INX  ; Make X = 1.
+DrawPlayerBulletsLoop
+        LDA playerBulletSlotArray,X
+        BEQ GoToNextPlayerBullet
+
+        JSR UpdatePlayerBulletPosition
+        STA playerBulletRamHiPtrArray,X
+        STA ramHiPtr
+        ROR
+
+        ; Check whether the bullet has hit something.
+        LDA ramLoPtr
+        ROR
+        CMP mantaBottomCannonLoPtr
+        BCC SkipToNextBullet
+        CMP mantaBottomCannonHiPtr
+        BCS SkipToNextBullet
+        LDA (ramLoPtr),Y
+        BPL DrawPlayerBullet
+        CMP #$90
+        BCC PlayerBulletBlockedByStructure
+        CMP #$A0
+        BCS DrawPlayerBullet
+        JSR PlayerBulletDestroysStructure
+        JMP SkipToNextBullet
+
+bulletCharDefLoPtr = someDataLoPtr
+bulletCharDefHiPtr = someDataHiPtr
+DrawPlayerBullet
+        STA charBehindPlayerBulletArray,X
+        STY bulletBackgroundCharSetDefHiPtr
+        ASL
+        ROL bulletBackgroundCharSetDefHiPtr
+        ASL
+        ROL bulletBackgroundCharSetDefHiPtr
+        ASL
+        ROL bulletBackgroundCharSetDefHiPtr
+        STA bulletBackgroundCharSetDefLoPtr
+
+        LDA bulletBackgroundCharSetDefHiPtr
+        ADC #>surfaceTextureCharacterSet
+        STA bulletBackgroundCharSetDefHiPtr
+
+        LDA offsetsForPlayerBullet,X
+maskForPlayerBullet   =*+$01
+        ORA #$80
+        STA bulletCharDefLoPtr
+        LDA #>surfaceTextureCharacterSet
+        STA bulletCharDefHiPtr
+
+        ; Copy the character set definition for the character underneath
+        ; the bullet to our character set definition for the bullet.
+        LDY #$07
+bulletBackgroundCharSetDefLoPtr   =*+$01
+bulletBackgroundCharSetDefHiPtr   =*+$02
+CharacterDefCopyLoop
+        LDA surfaceTextureCharacterSet,Y
+        STA (bulletCharDefLoPtr),Y
+        DEY
+        BPL CharacterDefCopyLoop
+
+        ; Draw the bullet by updating the character set definition we
+        ; copied above by drawing a line (AA) across it.
+        LDY bulletOffsetsInCharsetDef,X
+        LDA #$00   ; The upper white line of the bullet.
+        STA (bulletCharDefLoPtr),Y
+        INY
+        LDA #$AA   ; The lower black line of the bullet.
+        STA (bulletCharDefLoPtr),Y
+
+
+        ; Write the updated charset to the appropriate
+        ; position on screen.
+        LDY #$00
+        TXA
+bulletSurfaceMask   =*+$01
+        ORA #$10
+        STA (ramLoPtr),Y
+
+GoToNextPlayerBullet
+        INX
+        CPX #$06
+        BCC DrawPlayerBulletsLoop
+
+        ; Reset the masks.
+        LDA maskForPlayerBullet
+        EOR #$80
+        STA maskForPlayerBullet
+        LDA bulletSurfaceMask
+        EOR #$10
+        STA bulletSurfaceMask
+        RTS
+
+PlayerBulletBlockedByStructure
+        LDA #$21
+        STA soundVariable1
+SkipToNextBullet
+        LDA playerBulletSlotArray,X
+        BEQ GoToNextPlayerBullet
+        LDA #$00
+        STA playerBulletSlotArray,X
+        BEQ GoToNextPlayerBullet
+        ; Falls through
+
+;-------------------------------------------------------------------
+; UpdatePlayerBulletPosition
+;-------------------------------------------------------------------
+UpdatePlayerBulletPosition
+        BMI b2ADA
+        CLC
+        ADC playerBulletRamLoPtrArray,X
+        STA playerBulletRamLoPtrArray,X
+        STA ramLoPtr
+        LDA playerBulletRamHiPtrArray,X
+        ADC #$00
+        RTS
+
+b2ADA
+        CLC
+        ADC playerBulletRamLoPtrArray,X
+        STA playerBulletRamLoPtrArray,X
+        STA ramLoPtr
+        LDA playerBulletRamHiPtrArray,X
+        ADC #-1
+        RTS
+
+;-------------------------------------------------------------------
+; PlayerBulletDestroysStructure
+;-------------------------------------------------------------------
+PlayerBulletDestroysStructure
+        TAY
+        LDA playerBulletRamLoPtrArray,X
+        SEC
+        SBC f33C6,Y
+        STA srcLoPtr
+        LDA playerBulletRamHiPtrArray,X
+        SBC f33D6,Y
+        STA srcHiPtr
+        LDA f33E6,Y
+        STA stashedYValue
+        STA initialValueOfY
+
+        LDA scoresForHittingStructuresArray,Y
+        TAY
+        STX dataIndex
+        JSR AddScoresFromHittingStuff
+
+        LDX dataIndex
+        LDA #$1B
+        STA soundVariable2
+UpdateDestroyedSurfaceLoop
+        LDY stashedYValue
+DestroyStructure
+        LDA (srcLoPtr),Y
+        CMP #$20
+        BCC SkipSpace
+        CMP #$F0
+        BCS GoToNextCharacter
+        SEC
+        SBC #$20
+        STA (srcLoPtr),Y
+GoToNextCharacter
+        DEY
+        BPL DestroyStructure
+
+        DEC initialValueOfY
+        BMI ExitDestroyLoopAndReturn
+        INC srcHiPtr
+        INC srcHiPtr
+        JMP UpdateDestroyedSurfaceLoop
+
+ExitDestroyLoopAndReturn
+        LDY #$00
+        RTS
+
+SkipSpace
+        STX dataIndex
+        TAX
+        LDA #$00
+        STA playerBulletSlotArray,X
+        LDX dataIndex
+        JMP GoToNextCharacter
+	
+;-------------------------------------------------------------------
+; UpdateScrollPositionUsingDirectionAndSpeed
+;-------------------------------------------------------------------
+UpdateScrollPositionUsingDirectionAndSpeed
+        LDA mantaDirectionAndSpeed
+        BEQ UpdatePixelsToScroll
+        BPL ScrollLeft
+
+        ; Set the scroll position with a precision at the character level.
+        LDA positionInsideScrollSegment
+        SEC
+        SBC mantaDirectionAndSpeed
+        STA positionInsideScrollSegment
+
+        ; Update the current scroll segment.
+        ; Will increment currentScrollSegment and move to next segment if carry bit is set.
+        ; Will stay on current segment if carry bit is not set.
+        LDA currentScrollSegment
+        SBC #$FF
+        STA currentScrollSegment
+
+        ; Set the scroll position with a precision of 8 bits within the character.
+UpdatePixelsToScroll
+        LDA #$08
+        SEC
+        SBC positionInsideScrollSegment
+        AND #$07
+        STA pixelsToScroll
+        RTS
+
+ScrollLeft
+        ; Set the scroll position with a precision at the character level.
+        LDA positionInsideScrollSegment
+        SEC
+        SBC mantaDirectionAndSpeed
+        STA positionInsideScrollSegment
+
+        ; Update the current scroll segment.
+        ; Will decrement currentScrollSegment and move to previous segment if carry bit is not set.
+        ; Will stay on current segment if carry bit is set.
+        LDA currentScrollSegment
+        SBC #$00
+        STA currentScrollSegment
+        JMP UpdatePixelsToScroll
+	
+;-------------------------------------------------------------------
+; ScrollShipSurface
+;-------------------------------------------------------------------
+ScrollShipSurface
+        LDA positionInsideScrollSegment
+        CLC
+        ADC #$07
+        STA scrollPositionLoPtr
+
+        ; Figure out which section of the dreadnought we're on.
+        ; currentScrollSegment tracks our position on the dreanought
+        ; in terms of 16 frames of 32 bytes each (the dreadnought is 512
+        ; bytes wide). The routine below performs the following mapping
+        ; for each value of currentScrollSegment:
+        ;
+        ; $X0 -> 8200, $X1 -> 8220, $X2 -> 8240, $X3 -> 8260
+        ; $X4 -> 8280, $X5 -> 82A0, $X6 -> 82C0, $X7 -> 82F0
+        ; $X8 -> 8300, $X9 -> 8320, $XA -> 8340, $XB -> 8360
+        ; $XC -> 8380, $XD -> 83A0, $XE -> 83C0, $XF -> 83F0
+        ;
+        ; Note that only the last 4 bits are actually used for the mapping,
+        ; the other 4 are ignored.
+        ; Remember that 8200 is the address of surfaceDataForCurrentLevel, 
+        ; so is the top left of the dreadnought map. 
+        LDA currentScrollSegment
+        ADC #$00
+        LSR
+        ROR scrollPositionLoPtr
+        LSR
+        ROR scrollPositionLoPtr
+        LSR
+        ROR scrollPositionLoPtr
+        AND #$01
+        STA secondHalfOfMap
+
+        LDA #>surfaceDataForCurrentLevel
+        ORA secondHalfOfMap
+        STA scrollPositionHiPtr
+        STA surfaceDataForCurrentLevelHiPtr
+        LDA scrollPositionLoPtr
+        STA surfaceDataForCurrentLevelLoPtr
+
+        LDA #>(SCREEN_RAM_HIBANK + $00F0)
+        STA screenRAMToDrawHiPtr
+        LDA #<(SCREEN_RAM_HIBANK + $00F0)
+        STA screenRAMToDrawLoPtr
+
+        LDX #$11
+DrawScrollingSurfaceRows   
+        LDY #$26
+DrawRowOfScrollingSurface   
+
+surfaceDataForCurrentLevelLoPtr   =*+$01
+surfaceDataForCurrentLevelHiPtr   =*+$02
+        LDA surfaceDataForCurrentLevel,Y
+screenRAMToDrawLoPtr   =*+$01
+screenRAMToDrawHiPtr   =*+$02
+        STA SCREEN_RAM_HIBANK + $00F0,Y
+
+        DEY
+        BPL DrawRowOfScrollingSurface
+
+        DEX
+        BEQ FinishScrollingAndCleanUp
+        INC surfaceDataForCurrentLevelHiPtr
+        INC surfaceDataForCurrentLevelHiPtr
+        LDA screenRAMToDrawLoPtr
+        CLC
+        ADC #$28
+        STA screenRAMToDrawLoPtr
+        BCC DrawScrollingSurfaceRows
+        INC screenRAMToDrawHiPtr
+
+        JMP DrawScrollingSurfaceRows
+
+FinishScrollingAndCleanUp
+        ; Update the stored positions of the player's cannon.
+        LDA scrollPositionLoPtr
+        CLC
+        ADC #$12
+        STA mantaTopCannonLoPtr
+
+        PHP
+        LDA mantaCurrentYPos
+        SEC
+        SBC #$58
+        AND #$F8
+        LSR
+        LSR
+        PLP
+        ADC scrollPositionHiPtr
+        STA mantaTopCannonHiPtr
+
+        LDA scrollPositionHiPtr
+        ROR
+        LDA scrollPositionLoPtr
+        ROR
+        STA mantaBottomCannonLoPtr
+
+        CLC
+        ADC #$14
+        STA mantaBottomCannonHiPtr
+        RTS
+
+;-------------------------------------------------------------------
+; AddStarsBehindDreadnought
+;-------------------------------------------------------------------
+AddStarsBehindDreadnought
+		rts
+
+
+;-------------------------------------------------------------------
+; AddScoresFromHittingStuff
+;-------------------------------------------------------------------
+AddScoresFromHittingStuff
+        SED
+        LDA scoresToAddArray1,Y
+        CLC
+        ADC playerScore + $03
+        STA playerScore + $03
+        LDA scoresToAddArray2,Y
+        ADC playerScore + $02
+        STA playerScore + $02
+        PHP
+        LDA playerScore + $01
+        ADC #$00
+        STA playerScore + $01
+        LDA playerScore
+        ADC #$00
+        STA playerScore
+        BCC AwardExtraLife
+        LDA #$99
+        STA playerScore
+        STA playerScore + $01
+        STA playerScore + $02
+        STA playerScore + $03
+        PLP
+        CLD
+        RTS
+
+AwardExtraLife
+        PLP
+        BCC b1A36
+        CLC
+        LDA currentPlayerLivesLeft
+        ADC #$01
+        BCS b1A36
+        STA currentPlayerLivesLeft
+        CLD
+        JSR UpdateLivesLeft
+        LDA #$81
+        STA soundVariable1
+        RTS
+
+b1A36   CLD
+        RTS
+	
+enemyFormationDataLoPtr = srcLoPtr
+enemyFormationDataHiPtr = srcHiPtr
+enemiesToUpdate = stashedYValue
+;-------------------------------------------------------------------
+; MaybeCreateNewEnemyFormation
+;-------------------------------------------------------------------
+MaybeCreateNewEnemyFormation
+        LDA someKindOfFrameRate
+        AND #$3F
+        CMP #$21
+        BNE DontCreateNewFormation
+
+        LDA usedToCheckIfWeShouldLaunchMine
+        BEQ SelectAFormation
+
+        CMP #$80
+        BNE DontCreateNewFormation
+
+        LDA #$00
+        STA usedToCheckIfWeShouldLaunchMine
+        LDA numberOfEnemiesSpawned
+        BNE b1A93
+
+        LDA whetherScoreAwardedForHittingEnemy
+        BNE b1A93
+
+        INC formationAnnihilationBonus
+b1A93
+        LDA #$00
+        STA numberOfEnemiesSpawned
+DontCreateNewFormation
+        RTS
+
+        ; Select a formation from enemyFormationData using
+        ; the *EnemyFormationOrder arrays, e.g. level1EnemyFormationOrder. 
+        ; If we've used up the array, select a random formation.
+SelectAFormation   
+        LDA #$00
+        STA enemyFormationDataHiPtr
+        LDA #$80
+        STA usedToCheckIfWeShouldLaunchMine
+        LDA #$AE
+        STA soundVariable2
+
+        LDY indexCurrentEnemyFormation
+        LDA (loPtrToEnemyFormationOrder),Y
+        CMP #$FF
+        BNE b1AB9
+
+        ; If we've used up the array, select a random formation.
+        LDA $D41B    ; Random Number Generator
+        AND #$03
+        CLC
+        ADC #$12
+        STA whetherScoreAwardedForHittingEnemy
+        JMP j1ABF
+
+b1AB9   INC indexCurrentEnemyFormation
+        LDX #$00
+        STX whetherScoreAwardedForHittingEnemy
+
+j1ABF   ASL
+        ROL enemyFormationDataHiPtr
+        ASL
+        ROL enemyFormationDataHiPtr
+        ASL
+        ROL enemyFormationDataHiPtr
+        ASL
+        ROL enemyFormationDataHiPtr
+        STA enemyFormationDataLoPtr
+
+        LDA enemyFormationDataHiPtr
+        ADC #>enemyFormationData
+        STA enemyFormationDataHiPtr
+
+        LDA #$FF
+        STA currentSpriteDisplayEnable
+        STA currentSpriteMultiColorMode
+        STA currentSpriteMSBXPosOffset
+        LDA spriteColorForLevel
+        STA currentSpriteColor
+
+        ; Get the sprite for this formation.
+        LDY #$0E
+        LDA (enemyFormationDataLoPtr),Y
+        STA currentEnemySpriteValue
+
+        TAX
+        LDA enemyHorizontalVelocityArray,X
+        STA enemyXPosForwardVelocity
+        EOR #$FF
+        CLC
+        ADC #$01
+        STA enemyXPosBackwardVelocity
+
+        LDA #$00
+        STA enemyBulletXPosIncrement
+        STA enemyXPosForwardIncrement
+        STA enemyYPosDownwardIncrement
+
+        LDA #-1
+        STA enemyXPosBackwardIncrement
+        STA enemyYPosUpwardIncrement
+
+        LDA enemyVerticalVelocityArray,X
+        STA enemyYPosDownwardVelocity
+        EOR #$FF
+        CLC
+        ADC #$01
+        STA enemyYPosUpwardVelocity
+
+        LDA currentPlayerLivesLeft
+        LSR
+        CLC
+        ADC indexToCurrentLevelTextureData
+        ADC selectForBulletsOrMines
+        ADC fireBulletOrMineArray,X
+        STA whetherToFireEnemyBulletOrMine
+
+        LDA bulletSpriteArray,X
+        STA bulletSpriteCurrentLevel
+
+        LDA indexToScoresToAddArray,X
+        STA scoreToAddForHittingEnemy
+
+        LDA enemeyBulletSpeedForLevel,X
+        STA enemyBulletXPosAnimationRate
+
+        ; Get initial X Position of formation.
+        ; 00 - means enter from the right
+        ; FF - means enter from the left
+        ; 80 - means ?
+        DEY                              ; Point to 14th byte in enemyFormationData.
+        LDA (enemyFormationDataLoPtr),Y
+        BEQ b1B45
+        CMP #$FF
+        BEQ b1B36
+        LDA $D41B    ; Random Number Generator
+        BPL b1B45
+
+        ; Entering from the left.
+b1B36   LDA mantaDirectionAndSpeed
+        EOR #$FF
+        CLC
+        ADC #$01
+        STA initialEnemyXPos
+
+        LDA mantaDirectionAndSpeed
+        BMI b1B4D
+        BPL b1B5B
+
+        ; Entering from the right.
+b1B45   LDA #$00
+        STA initialEnemyXPos
+
+        ; Choose the direction of the enemy sprite based on the
+        ; the direction the manta is travelling.
+        LDA mantaDirectionAndSpeed
+        BMI b1B5B
+
+        ; Manta is travelling to the left, so choose right-facing sprite
+b1B4D   LDA #$A4
+        STA currentSpriteXPos
+        LDA currentEnemySpriteValue
+        CLC
+        ADC #$A0               ; Add A0 to point to the right-facing sprite.
+        STA currentSpriteValue
+        JMP GetMovementStrategyDuration
+
+        ; Manta is travelling to the right, so choose left-facing sprite.
+b1B5B   LDA #$A2
+        STA currentSpriteXPos
+        LDA currentEnemySpriteValue
+        CLC
+        ADC #$B0               ; Add B0 to point to the right-facing sprite.
+        STA currentSpriteValue
+
+        ; Reverse the increment values for left-facing sprites.
+        LDA enemyXPosBackwardVelocity
+        LDX enemyXPosForwardVelocity
+        STX enemyXPosBackwardVelocity
+        STA enemyXPosForwardVelocity
+
+        LDA enemyXPosBackwardIncrement
+        LDX enemyXPosForwardIncrement
+        STX enemyXPosBackwardIncrement
+        STA enemyXPosForwardIncrement
+
+        ; Reverse the bullet animation direction for left facing sprites.
+        LDA enemyBulletXPosAnimationRate
+        EOR #$FF
+        CLC
+        ADC #$01
+        STA enemyBulletXPosAnimationRate
+        LDA #-1
+        STA enemyBulletXPosIncrement
+
+        ; Get the rate at which we tick through the items in the movement
+        ; strategy.
+GetMovementStrategyDuration
+        LDY #$0C
+        LDA (enemyFormationDataLoPtr),Y
+        STA durationOfStrategyForFormation
+        LDA #$00
+        STA durationOfStrategyForNextEnemyInFormation
+
+        ; Get the movement strategy and initial Y position for all enemies
+        ; in the formation.
+        LDY #$05
+        STY enemiesToUpdate
+        LDX #$0A
+        STX dataIndex
+InitializeEnemyLoop   
+        LDY enemiesToUpdate
+        STY spriteIndex
+
+        ; Get the movement strategy to be used by the
+        ; formation.
+        LDA (enemyFormationDataLoPtr),Y
+        BEQ SetYPositionsOfEnemies
+
+        ; Select the movement strategy in enemyMovementStrategyLoPtrArray.
+        LDX dataIndex
+        TAY
+        LDA enemyMovementStrategyLoPtrArray,Y
+        STA enemyMovementStrategyLoPtr,X
+        INX
+        LDA enemyMovementStrategyHiPtrArray,Y
+        STA enemyMovementStrategyLoPtr,X
+
+        ; Make sure the next thing the enemy does is update its position.
+        LDY enemiesToUpdate
+        LDA #$02 ; UpdateEnemyPositions
+        STA indexToEnemyUpdatePtrArray,Y
+
+        INC usedToCheckIfWeShouldLaunchMine
+        INC numberOfEnemiesSpawned
+
+        LDA durationOfStrategyForNextEnemyInFormation
+        STA durationOfMovementStrategyForEnemy,Y
+        CLC
+        ADC durationOfStrategyForFormation
+        STA durationOfStrategyForNextEnemyInFormation
+
+        ; Get the Y positions to be used for each of the enemy
+        ; ships in the formation.
+SetYPositionsOfEnemies
+        TYA
+        CLC
+        ADC #$06
+        TAY
+        LDA (enemyFormationDataLoPtr),Y
+        BNE b1BCB
+        ; If no Y pos set, use the player's Y pos.
+        LDA mantaCurrentYPos
+b1BCB   STA currentSpriteYPos
+        JSR ApplySpriteVariablesAndDisplay
+
+        LDY enemiesToUpdate
+        LDA enemyBulletXPosIncrement
+        STA enemyFiringStrategy,Y
+
+        LDA #$00
+        STA enemyMovementStrategies,Y
+        STA enemyXPosCurrentVelocityMSBOffsetArray,Y
+        STA enemyXPosVelocityLimitArray,Y
+        STA enemyYPosCurrentVelocityArray,Y
+        STA enemyYPosVelocityLimitArray,Y
+
+        LDA initialEnemyXPos
+        STA enemyXPosCurrentVelocityArray,Y
+        BPL b1BF4
+
+        LDA #$FF
+        STA enemyXPosCurrentVelocityMSBOffsetArray,Y
+
+b1BF4   DEC dataIndex
+        DEC dataIndex
+        DEC enemiesToUpdate
+        BPL InitializeEnemyLoop
+        RTS
+	
+;-------------------------------------------------------------------
+; ApplySpriteVariablesAndDisplay
+;-------------------------------------------------------------------
+ApplySpriteVariablesAndDisplay
+        LDY spriteIndex
+        LDA msbForSpriteArray,Y
+        STA currentSpriteMSB
+        EOR #$FF
+        STA spriteMixerValue
+        LDA currentSpriteColor
+        STA $D027,Y  ;Sprite 0 Color
+        LDA currentSpriteMultiColorMode
+        BEQ bB0FE
+        LDA currentSpriteMSB
+        ORA $D01C    ;Sprites Multi-Color Mode Select
+        BNE bB103
+bB0FE   LDA $D01C    ;Sprites Multi-Color Mode Select
+        AND spriteMixerValue
+bB103   STA $D01C    ;Sprites Multi-Color Mode Select
+        LDA currentSpriteExpandVertical
+        BEQ bB111
+        LDA currentSpriteMSB
+        ORA $D017    ;Sprites Expand 2x Vertical (Y)
+        BNE bB116
+bB111   LDA $D017    ;Sprites Expand 2x Vertical (Y)
+        AND spriteMixerValue
+bB116   STA $D017    ;Sprites Expand 2x Vertical (Y)
+        LDA currentSpriteExpandHorizontal
+        BEQ bB124
+        LDA currentSpriteMSB
+        ORA $D01D    ;Sprites Expand 2x Horizontal (X)
+        BNE bB129
+bB124   LDA $D01D    ;Sprites Expand 2x Horizontal (X)
+        AND spriteMixerValue
+bB129   STA $D01D    ;Sprites Expand 2x Horizontal (X)
+        LDA currentSpriteBackgroundDisplayPriority
+        BEQ bB137
+        LDA currentSpriteMSB
+        ORA $D01B    ;Sprite to Background Display Priority
+        BNE bB13C
+bB137   LDA $D01B    ;Sprite to Background Display Priority
+        AND spriteMixerValue
+bB13C   STA $D01B    ;Sprite to Background Display Priority
+
+;-------------------------------------------------------------------
+; DisplayCurrentSprite
+;-------------------------------------------------------------------
+DisplayCurrentSprite
+        LDY spriteIndex
+        LDA msbForSpriteArray,Y
+        STA currentSpriteMSB
+        EOR #$FF
+        STA spriteMixerValue
+        LDA currentSpriteValue
+        STA sprite0Ptr,Y
+        TYA
+        ASL
+        TAY
+        LDA currentSpriteXPos
+        STA $D000,Y  ;Sprite 0 X Pos
+        LDA currentSpriteYPos
+        STA $D001,Y  ;Sprite 0 Y Pos
+        LDA currentSpriteMSBXPosOffset
+        AND #$01
+        STA currentSpriteMSBXPosOffset
+        LDA currentSpriteMSBXPosOffset
+        BEQ bB16D
+        LDA currentSpriteMSB
+        ORA $D010    ;Sprites 0-7 MSB of X coordinate
+        BNE bB172
+bB16D   LDA $D010    ;Sprites 0-7 MSB of X coordinate
+        AND spriteMixerValue
+bB172   STA $D010    ;Sprites 0-7 MSB of X coordinate
+        LDA currentSpriteDisplayEnable
+        BEQ bB180
+        LDA currentSpriteMSB
+        ORA $D015    ;Sprite display Enable
+        BNE bB185
+bB180   LDA $D015    ;Sprite display Enable
+        AND spriteMixerValue
+bB185   STA $D015    ;Sprite display Enable
+        RTS	
 ;------------------------------------------------------------
 ; main loop
 ;------------------------------------------------------------
@@ -444,6 +1467,7 @@ checkShaftEx	rts
 ;-------------------------------------------------------------------
 ; 
 ;-------------------------------------------------------------------
+MaybeFirePlayerBullets
 checkFire	lda bulletFlag
 		bmi checkFire1
 		beq checkFire3
@@ -1343,7 +2367,7 @@ filltitle:	lda #$30
 ; =================================================================
 copyRomRam   	sei          
 		ldy #$00     
-		sty nmien    
+		sty nmien    					;disable IRQ & NMI
 		
 		; --- startadresse für smc setzen ---
 		lda #$c0      
@@ -1385,7 +2409,7 @@ sm_wr		sta $c000,y 					; das high-byte ($c0) wird dynamisch modifiziert
 chk_end 	cmp #$00					; fertig bei überlauf von $ff nach $00
 		bne page_lp  
 
-		cli          
+;		cli						;keep IRQ turned off
 		rts
 		
 ;-------------------------------------------------------------------
@@ -1428,9 +2452,9 @@ copydlist	lda dl,x
 		stx gractl
 		
 		lda #<dliproc 
-		sta vdslst
+		sta nmivkt
 		lda #>dliproc 
-		sta vdslst+1
+		sta nmivkt+1
 
 		lda #<mathpack
 		sta dlistl
@@ -2405,6 +3429,40 @@ bulletPosLo	.byte 0, 0, 0, 0, 0, 0
 bulletPosHi	.byte 0, 0, 0, 0, 0, 0
 bulletOldChar	.byte 0, 0, 0, 0, 0, 0
 
+msbForSpriteArray
+		.BYTE $01,$02,$04,$08,$10,$20,$40,$80
+enemyXPosCurrentVelocityArray
+:8		.byte 0
+enemyYPosCurrentVelocityArray
+:8		.byte 0
+enemyXPosCurrentVelocityMSBOffsetArray
+:8		.byte 0
+enemyXPosVelocityLimitArray
+:8		.byte 0
+enemyYPosVelocityLimitArray
+:8		.byte 0
+enemyMovementStrategies
+:8		.byte 0
+enemyFiringStrategy
+:8		.byte 0
+indexToEnemyUpdatePtrArray
+:8		.byte 0
+durationOfMovementStrategyForEnemy
+:8		.byte 0
+playerBulletRamLoPtrArray
+:16		.byte 0
+playerBulletRamHiPtrArray
+:16		.byte 0
+charBehindPlayerBulletArray
+:16		.byte 0
+playerBulletSlotArray
+:16		.byte 0
+bulletOffsetsInCharsetDef
+:16		.byte 0
+offsetsForPlayerBullet
+		.byte $00,$08,$10,$18,$20,$28,$30,$38
+		.byte $40,$48,$50,$58,$60,$68,$70,$78
+
 hitPtrLo	.byte $00,$01,$00,$01,$00,$01,$02,$00
 		.byte $01,$02,$00,$01,$02,$00,$00,$00
 hitPtrHi	.byte $00,$00,$02,$02,$00,$00,$00,$02
@@ -2448,8 +3506,8 @@ tileDataPtrHi
 :160		.byte 0
 
 
-		icl "EgoUridium-Manta.asm"	
-		icl "explosion_sprites.asm"
+;		icl "EgoUridium-Manta.asm"	
+;		icl "explosion_sprites.asm"
 		
 titleCharset	ins "main-charset.bin"
 surfaceCharset	ins "surface-common-charset.bin"
