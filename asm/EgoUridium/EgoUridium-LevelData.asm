@@ -1,3 +1,8 @@
+notUsed = $8010 
+surfaceCharset1 = $0100
+surfaceCharset2 = $0200
+surfaceCharset3 = $0300
+
 charsetArray
 	.byte $08,$00,$08,$00,$00,$08,$04,$00
         .BYTE $04,$08,$00,$08,$04,$00,$08
@@ -9,7 +14,22 @@ levelColorBak
 levelColorPf0
 	.byte $08,$06,$16,$08,$ba,$fa,$a8,$06
 	.byte $88,$06,$16,$ba,$04,$86,$18
-	
+
+dreadnoughtDataForLevelLoPtrArray ;= $E010
+        .BYTE <notUsed,<levelOneDreadnoughtData,<level2DreadnoughtData,<level3DreadnoughtData
+        .BYTE <level4DreadnoughtData,<level5DreadnoughtData,<level6DreadnoughtData,<level7DreadnoughtData
+        .BYTE <level8DreadnoughtData,<level9DreadnoughtData,<level10DreadnoughtData,<level11DreadnoughtData
+        .BYTE <level12DreadnoughtData,<level13DreadnoughtData,<level14DreadnoughtData,<level15DreadnoughtData
+dreadnoughtDataForLevelHiPtrArray ;= $E020
+        .BYTE >notUsed,>levelOneDreadnoughtData,>level2DreadnoughtData,>level3DreadnoughtData
+        .BYTE >level4DreadnoughtData,>level5DreadnoughtData,>level6DreadnoughtData,>level7DreadnoughtData
+        .BYTE >level8DreadnoughtData,>level9DreadnoughtData,>level10DreadnoughtData,>level11DreadnoughtData
+        .BYTE >level12DreadnoughtData,>level13DreadnoughtData,>level14DreadnoughtData,>level15DreadnoughtData
+
+levelSurfaceDataHiPtrArray ;= $E040
+        .BYTE >surfaceCharset2,>surfaceCharset3,>surfaceCharset1,>surfaceCharset3,>surfaceCharset1,>surfaceCharset2,>surfaceCharset3,>surfaceCharset2
+        .BYTE >surfaceCharset1,>surfaceCharset2,>surfaceCharset3,>surfaceCharset1,>surfaceCharset3,>surfaceCharset2,>surfaceCharset1,>surfaceCharset3
+
 textureDataForLevelLoPtrArray
         .BYTE <levelOneDreadnoughtData,<level2DreadnoughtData,<level3DreadnoughtData
         .BYTE <level4DreadnoughtData,<level5DreadnoughtData,<level6DreadnoughtData,<level7DreadnoughtData

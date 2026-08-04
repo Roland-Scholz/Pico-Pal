@@ -10,13 +10,9 @@
 ; $6800 - $6fff sprites $a0-$bf meanies
 ;------------------------------------------------------------
 
-	icl "System-Equates.asm"
-	icl "EgoRAM-Equates.asm"
+	icl "..\System-Equates.asm"
+	icl "..\EgoRAM-Equates.asm"
 	icl "EgoUridium-Constants.asm"
-
-SCREEN_RAM_HIBANK = $4800
-sprite0Ptr = SCREEN_RAM_HIBANK + $03F8
-SURFACETEXTURECHARACTERSET = $CAFE				;to do!!!
 
 playerScore = $20
 indexCurrentEnemyFormation = $24
@@ -45,7 +41,6 @@ aF9 = $F9
 ;
 ; **** ZP ABSOLUTE ADRESSES ****
 ;
-SPACE = $20
 RAM_ACCESS_MODE = $01
 currentSpriteMSB = $02
 spriteMixerValue = $03
@@ -61,18 +56,26 @@ currentSpriteExpandHorizontal = $0C
 currentSpriteColor = $0D
 currentSpriteValue = $0E
 secondHalfOfMap = a0F
+pixelYPositionOfPlayerBullet = a0F
 a0F = $0F
 dataIndex = $10
 stashedYValue = $11
+dreadnoughtDataLoPtr = $12
+colorRamLoPtr = $12
+dreadnoughtDataHiPtr = $13
 colorRamHiPtr = $13
 someDataLoPtr = $14
 someDataHiPtr = $15
-leftPressed = $16
+currentLevelSurfaceDataHiPtr = someDataHiPtr
+currentLevelSurfaceDataLoPtr = someDataLoPtr
+upPressed = $16
 rightPressed = $17
 firePressed = $18
 bitMapForPlayerVolumeAndColor = $19
 srcLoPtr = $1A
 srcHiPtr = $1B
+spriteVariablesLoPtr = srcLoPtr
+spriteVariablesHiPtr = srcHiPtr
 ramLoPtr = $1C
 ramHiPtr = $1D
 a1F = $1F
@@ -133,7 +136,7 @@ pausedOrNotPaused = $5A
 a5B = $5B
 playerAndJoystickMode = $5C
 currentPlayer = $5D
-fakeLeftPressed = $5E
+fakeupPressed = $5E
 fakeRightPressed = $5F
 pausePressed = $60
 monochromEnabled = $61
@@ -205,7 +208,10 @@ aB7 = $B7
 aB8 = $B8
 aBA = $BA
 aBB = $BB
+temp = aBA
+cnt = aBB
 aBC = $BC
+dataLoPtr = $BE
 dataHiPtr = $BF
 aEF = $EF
 aF0 = $F0
@@ -215,42 +221,42 @@ aFB = $FB
 aFC = $FC
 
 ptr			= ramLoPtr
-
-tileDataPtr		= $82
-screenPtr		= $84
-dreadPtr		= $86
-dreadXPos		= $86
-destPtr			= $88
-charSetPtr		= $8a
-temp			= $8c
-currentScoreCharToWrite = temp
-colorbk			= $8d
-colorpf0		= $8e
-colorpf1		= $8f
-colorpf2		= $90
-rndidx			= $91
-cnt			= $92
-bulletFlag		= $94
-bulletCnt		= $95
-bulletYPos		= $96
-bulletSlotX		= $97
-leftbound		= $98
-rightbound		= $99
-tempX			= $9a
-decalState		= $a4
-currentDigitInScore	= $a7
-minePos0		= $a8
-minePos1		= $a9
-hspeed			= $aa
-
-p0Ypos			= $c0
-p1Ypos			= $c1
-p2Ypos			= $c2
-p3Ypos			= $c3
-colorp0			= $c4
-colorp1			= $c5
-colorp2			= $c6
-colorp3			= $c7
+;
+;tileDataPtr		= $82
+;screenPtr		= $84
+;dreadPtr		= $86
+;dreadXPos		= $86
+;destPtr			= $88
+;charSetPtr		= $8a
+;temp			= $8c
+;currentScoreCharToWrite = temp
+;colorbk			= $8d
+;colorpf0		= $8e
+;colorpf1		= $8f
+;colorpf2		= $90
+;dataIndex			= $91
+;cnt			= $92
+;bulletFlag		= $94
+;bulletCnt		= $95
+;bulletYPos		= $96
+;bulletSlotX		= $97
+;leftbound		= $98
+;rightbound		= $99
+;tempX			= $9a
+;decalState		= $a4
+;currentDigitInScore	= $a7
+;minePos0		= $a8
+;minePos1		= $a9
+;hspeed			= $aa
+;
+;p0Ypos			= $c0
+;p1Ypos			= $c1
+;p2Ypos			= $c2
+;p3Ypos			= $c3
+;colorp0			= $c4
+;colorp1			= $c5
+;colorp2			= $c6
+;colorp3			= $c7
 
 WIDTH			= 40
 WIDTHPIX		= 160
@@ -263,8 +269,24 @@ RIGHT			= $07
 UP			= $0e
 DOWN			= $0f
 
-dreadnaught		= $C000-$2200		;= $9E00
-SURFACEDATAFORCURRENTLEVEL = dreadnaught
+;------------------------------------------------------------
+; $8010 - $954f		17x8   surface gfx lines, 40 bytes each
+; $9860 - $9cff		 4x8   title gfx lines, 40 bytes each
+; $9d60 - $9dff		 4x40  bytes title char data
+; $9e00 - $afff		17x512 bytes surface char data
+;------------------------------------------------------------
+SCREEN_RAM_HIBANK = $4800
+sprite0Ptr = SCREEN_RAM_HIBANK + $03F8
+
+
+surfaceStructureDataLoPtrArray = $c000
+surfaceStructureDataHiPtrArray = $c100
+
+dreadnaught		= $C000-$2200				;= $9E00
+surfaceDataForCurrentLevel = dreadnaught
+startOfSurfaceDataForCurrentLevel = dreadnaught + $2040
+
+surfaceTextureCharacterSet = $CAFE				;to do!!!
 
 mathpack		= $d800
 intCharset		= $cc00
@@ -301,13 +323,154 @@ explosion_major46	= 46
 ;------------------------------------------------------------
 	
 		.proc main
-	
+		
 		jsr initGame		
 
 restart		jsr initLevel
-		jsr UpdateLivesLeft
+		;jsr UpdateLivesLeft
+		jmp MaybeStartNewLevel
 
 
+;--------------------------------------------------------------------
+; EnterNewLevel
+;--------------------------------------------------------------------
+EnterNewLevel
+        ;JSR SetInterruptToIRQInterrupt1
+        LDX #<spaces
+        LDY #>spaces
+        JSR WriteToScreen
+        JSR UpdateLivesLeft
+        ;JSR UpdatePlayerDecalColors
+;       LDA #$00
+;       STA $D015    ;Sprite display Enable
+;        LDA #$30
+;        JSR Write21LinesOfAccumulatorValToScreen
+
+        ;LDX #<newLevelColors
+        ;LDY #>newLevelColors
+        ;STX srcLoPtr
+        ;STY srcHiPtr
+        ;LDX #<COLOR_RAM + $00A0
+        ;LDY #>COLOR_RAM + $00A0
+        ;STX ramLoPtr
+        ;STY ramHiPtr
+        ;LDY #$0D
+        ;JSR WriteSourceValueToRam
+
+        LDX #<gameOn
+        LDY #>gameOn
+        JSR WriteToScreen
+        LDA currentPlayer
+        CMP #$01
+        BEQ b0C5F
+
+        ; Player 2
+        LDX #<player2
+        LDY #>player2
+        JSR WriteToScreen
+        JMP j0C66
+
+        ; Player 1
+b0C5F   LDX #<player1
+        LDY #>player1
+        JSR WriteToScreen
+
+j0C66   LDA currentPlayerLivesLeft
+        LDX #$30
+        LSR
+        LSR
+        LSR
+        LSR
+        BEQ b0C71
+        TAX
+b0C71   STX tensLivesLeftDisplayed
+        LDA currentPlayerLivesLeft
+        AND #$0F
+        STA livesLeftDisplayed
+        LDX #<livesLeftText
+        LDY #>livesLeftText
+        JSR WriteToScreen
+        LDX #<uridiumDecal
+        LDY #>uridiumDecal
+        JSR WriteToScreen
+;       LDA #M_WHITE
+;       STA $D026    ;Sprite Multi-Color Register 1
+;       LDA #$FE
+;       STA $D025    ;Sprite Multi-Color Register 0
+        LDX #<spriteVariablesManta
+        LDY #>spriteVariablesManta
+        STX spriteVariablesLoPtr
+        STY spriteVariablesHiPtr
+        JSR LoadSpriteVariablesAndDisplay
+        JSR SpinWaitingForJoystickInput
+        JSR GenerateRandomDataFromRNG
+
+        LDA #$03
+        STA soundVariable1
+        LDA #$04
+        STA soundVariable2
+        LDA #$05
+        STA soundVariable3
+        LDA #$BF
+        STA someKindOfFrameRate
+	
+	jsr char2title
+
+SpinningShipAnimationLoop
+	;lda #0
+	;sta dbgpos
+	;lda someKindOfFrameRate
+	;jsr puthex
+	;lda currentSpriteValue
+	;jsr puthex
+	;lda spriteIndex
+	;jsr puthex
+	;lda currentSpriteDisplayEnable
+	;jsr puthex
+	;lda currentSpriteXPos
+	;jsr puthex
+	;lda currentSpriteYPos
+	;jsr puthex
+	
+        JSR CheckInputMaybeUpdateDecal
+        LDA firePressed
+        BEQ SpinningShipAnimationOver
+        LDA someKindOfFrameRate
+        BEQ SpinningShipAnimationOver
+        JSR MaybeShowPauseScreen
+        JSR GetCurrentSprite
+        INC currentSpriteValue
+        LDA currentSpriteValue
+        CMP #MANTA_LEFT_0
+        BCC b0CD1
+        LDA #MANTA
+        STA currentSpriteValue
+b0CD1   JSR DisplayCurrentSprite
+	jsr char2gfx
+	jsr renderSprites
+        JMP SpinningShipAnimationLoop
+
+        ; The spinning ship sequence is over, or the user has pressed
+        ; fire so start the ship deployment sequence.
+SpinningShipAnimationOver
+        LDA #$12
+        STA soundOrTitleSelector
+	;SEI
+	;JSR PlayTitleTune
+	;CLI
+        JSR SetUpScreenForScrolling
+        JSR UpdatePointersAndFetchSurfaceData
+	;JSR PlayShipDeploymentSequence
+
+;        LDA backgroundColor2
+;        STA $D02E    ;Sprite 7 Color
+        LDY #$07
+b0CF0   LDA someKindOfSettingArray,Y
+        STA a35,Y
+        DEY
+        BPL b0CF0
+
+	dec mantaDirectionAndSpeed
 ;--------------------------------------------------------------------
 ; MainGameLoop
 ;--------------------------------------------------------------------
@@ -318,32 +481,46 @@ MainGameLoop
 	lda #112
 	jsr waitvcnt
 	
-        JSR AnimatePlayerBullet
+	lda #0
+	sta dbgpos
+	lda scrollPositionHiPtr
+	jsr puthex
+	lda scrollPositionLoPtr
+	jsr puthex
+	lda mantaDirectionAndSpeed
+	jsr puthex
+	lda pixelsToScroll
+	jsr puthex
+
+        ;JSR AnimatePlayerBullet
         JSR UpdateScrollPositionUsingDirectionAndSpeed
         JSR ScrollShipSurface
+	jsr char2gfx
 ;        JSR AddStarsBehindDreadnought
 ;        JSR UpdateColorsOnScreen
 ;        JSR UpdateEnemies
         INC someKindOfFrameRate
-;        JSR GetJoystickInput
+        JSR GetJoystickInput
 
         ; Perform one of seven functions at each loop.
-        LDA someKindOfFrameRate
-        AND #$07
-        TAY
-        LDA mainLoopJumpTableHiPtr,Y
-        STA mymainGameLoopHiPtr
-        LDA mainLoopJumpTableLoPtr,Y
-        STA mymainGameLoopLoPtr
-mymainGameLoopLoPtr   =*+$01
-mymainGameLoopHiPtr   =*+$02
-        JSR MaybeChangeTitleDecal
+;        LDA someKindOfFrameRate
+;        AND #$07
+;        TAY
+;        LDA mainLoopJumpTableHiPtr,Y
+;        STA mymainGameLoopHiPtr
+;        LDA mainLoopJumpTableLoPtr,Y
+;        STA mymainGameLoopLoPtr
+;mymainGameLoopLoPtr   =*+$01
+;mymainGameLoopHiPtr   =*+$02
+;        JSR MaybeChangeTitleDecal
 
-        JSR MaybeFirePlayerBullets
-        ;JSR MaybeMoveLeft
-        ;JSR MaybeMoveRight
-        ;JSR UpdateABunchOfGameVariables
-        ;JSR AnimateMantaShip
+        ;JSR MaybeFirePlayerBullets
+        JSR MaybeMoveLeft
+        JSR MaybeMoveRight
+        JSR UpdateABunchOfGameVariables
+        JSR AnimateMantaShip
+	jsr renderSprites
+	
         ;JSR CheckLandNowWarning
         LDA landNowActivated
         BPL b0D41
@@ -352,11 +529,948 @@ mymainGameLoopHiPtr   =*+$02
 b0D41   LDA hasShipBeenHit
         BEQ MainGameLoop
 	
+	bne MainGameLoop
 ;--------------------------------------------------------------------
 ; DoNothing
 ;--------------------------------------------------------------------
 DoNothing
         RTS
+	
+	
+;-------------------------------------------------------------------
+; AnimateMantaShip
+;-------------------------------------------------------------------
+AnimateMantaShip
+        LDA a46
+        BPL DrawTheAnimation
+
+        LDA a45
+        AND #$04
+        BEQ RightFacingAnimation
+
+LeftFacingAnimation
+        LDA a45
+        ASL
+        ASL
+        ASL
+        AND #$18
+        STA a0F
+        LDA a46
+        AND #$07
+        ORA a0F
+        TAX
+        LDA mantaleftFacingAnimationLoPtrArray,X
+        STA mantaAnimationLoPtr
+        LDA mantaleftFacingAnimationHiPtrArray,X
+        STA mantaAnimationHiPtr
+
+j2737   LDY #$00
+        LDA (mantaAnimationLoPtr),Y
+        STA framesInAnimation
+        TAY
+        INY
+        LDA (mantaAnimationLoPtr),Y
+        STA a47
+        BNE b2749
+        LDA a3F
+        BNE b274E
+b2749   INY
+        LDA (mantaAnimationLoPtr),Y
+        STA a3F
+b274E   LDA a46
+        STA a45
+        LDA #$00
+        STA a46
+        RTS
+
+RightFacingAnimation   
+        LDA a45
+        ASL
+        ASL
+        ASL
+        AND #$18
+        STA a0F
+        LDA a46
+        AND #$07
+        ORA a0F
+        TAX
+        LDA mantaRightFacingAnimationLoPtrArray,X
+        STA mantaAnimationLoPtr
+        LDA mantaRightFacingAnimationHiPtrArray,X
+        STA mantaAnimationHiPtr
+        JMP j2737
+
+DrawTheAnimation   
+        LDA a45
+        BMI b277B
+        JMP DrawMantaAnimationFrame
+
+b277B   LDA someKindOfFrameRate
+        AND #$01
+        BNE DrawMantaAnimationFrame
+        LDY framesInAnimation
+        LDA (mantaAnimationLoPtr),Y
+        STA newSpriteValue
+        LDA a47
+        BEQ b2793
+        LDA mantaShadowOffsets,Y
+        CLC
+        ADC mantaShadowOffset
+        STA mantaShadowOffset
+b2793   DEC framesInAnimation
+        BNE DrawMantaAnimationFrame
+        LDA a45
+        AND #$7F
+        STA a45
+        LDA #$00
+        STA a3F
+        STA a47
+
+        ; Draw the animation frame.
+DrawMantaAnimationFrame   
+        LDA #$06
+        STA spriteIndex
+        JSR GetCurrentSprite
+        LDA newSpriteValue
+        STA currentSpriteValue
+        CLC
+        ADC #$30
+        STA mantaShadowSpriteValue
+        LDA mantaCurrentYPos
+        STA currentSpriteYPos
+        JSR DisplayCurrentSprite
+
+        ; Draw the Manta's shadow.
+        INC spriteIndex
+        JSR GetCurrentSprite
+        LDA mantaShadowSpriteValue
+        STA currentSpriteValue
+        LDA mantaShadowOffset
+        LSR
+        CLC
+        ADC mantaCurrentYPos
+        STA currentSpriteYPos
+        LDA #MANTA_HORIZONTAL_POSITION
+        CLC
+        ADC mantaShadowOffset
+        STA currentSpriteXPos
+        JSR DisplayCurrentSprite
+        ; Falls through
+	
+;-------------------------------------------------------------------
+; UpdateABunchOfGameVariables
+;-------------------------------------------------------------------
+UpdateABunchOfGameVariables
+        LDA a34
+        CLC
+        ADC mantaCurrentYPos
+;        CMP #$62
+        CMP #$15
+        BCS b2697
+;        LDA #$62
+        LDA #$15
+b2697   ;CMP #$D7
+	cmp #$89
+        BCC b269D
+;        LDA #$D7
+        LDA #$89
+b269D   STA mantaCurrentYPos
+        LDA mantaDirectionAndSpeed
+        BMI b26D1
+        CMP a38
+        BCC b26AB
+        LDA a38
+        STA mantaDirectionAndSpeed
+b26AB   LDA a45
+        BMI b26EB
+        LDA currentScrollSegment
+        BNE b26BA
+        LDA #$C8
+        STA a3F
+        JMP b26EB
+
+b26BA   CMP #$0E
+        BCC b26EB
+        LDA positionInsideScrollSegment
+        BPL b26EB
+b26C2   LDA a45
+        ORA #$80
+        STA a46
+        JMP b26EB
+
+b26CB   LDA positionInsideScrollSegment
+        BMI b26EB
+        BPL b26C2
+b26D1   CMP a37
+        BCS b26D9
+        LDA a37
+        STA mantaDirectionAndSpeed
+b26D9   LDA a45
+        BMI b26EB
+        LDA currentScrollSegment
+        BMI b26EB
+        BEQ b26CB
+        CMP #$0E
+        BCC b26EB
+        LDA #$38
+        STA a3F
+b26EB   LDA a3E
+        CMP #$03
+        BCS b26FF
+        CMP #$02
+        BCS b2700
+        LDA a45
+        BMI b26FF
+        EOR #$04
+        ORA #$80
+        STA a46
+b26FF   RTS
+
+b2700   LDA a45
+        BMI b26FF
+        AND #$03
+        CMP #$01
+        BEQ b26FF
+        LDA a45
+        AND #$FC
+        ORA #$81
+        STA a46
+        RTS
+
+;-------------------------------------------------------------------
+; CheckInputMaybeUpdateDecal
+;-------------------------------------------------------------------
+CheckInputMaybeUpdateDecal
+        JSR GetJoystickInput
+        JSR MaybeChangeTitleDecal
+        LDY #$18
+        JSR WasteCyclesUsingXAndY
+        INC someKindOfFrameRate
+        RTS
+
+;-------------------------------------------------------------------
+; GetCurrentSprite
+;-------------------------------------------------------------------
+GetCurrentSprite
+        LDY spriteIndex
+        LDA msbForSpriteArray,Y
+        STA currentSpriteMSB
+	
+	lda spriteShape,y
+	sta currentSpriteValue
+	
+	lda spriteXpos,y
+	asl
+	sta currentSpriteXPos
+	lda #0
+	rol
+	beq GetCurrentSprite1
+	lda #$ff
+GetCurrentSprite1	
+	sta currentSpriteMSBXPosOffset
+	
+	lda spriteYpos,y
+	sta currentSpriteYPos
+
+	lda spriteEna,y
+	sta currentSpriteDisplayEnable
+	rts
+	
+	
+	
+	
+        EOR #$FF
+        STA spriteMixerValue
+        LDA $D027,Y  ;Sprite 0 Color
+        STA currentSpriteColor
+        LDA sprite0Ptr,Y
+        STA currentSpriteValue
+        TYA
+        ASL
+        TAY
+        LDA $D000,Y  ;Sprite 0 X Pos
+        STA currentSpriteXPos
+        LDA $D001,Y  ;Sprite 0 Y Pos
+        STA currentSpriteYPos
+        LDA $D010    ;Sprites 0-7 MSB of X coordinate
+        AND currentSpriteMSB
+        BEQ bB088
+        LDA #$FF
+bB088   STA currentSpriteMSBXPosOffset
+        LDA $D015    ;Sprite display Enable
+        AND currentSpriteMSB
+        STA currentSpriteDisplayEnable
+        RTS
+
+;-------------------------------------------------------------------
+; SetUpScreenForScrolling
+;-------------------------------------------------------------------
+SetUpScreenForScrolling
+        JSR LoadSurfaceStructureData
+        LDA #$40
+        STA positionInsideScrollSegment
+        LDA #M_WHITE
+        STA currentBackgroundColor
+        LDA #$00
+        STA currentScrollSegment
+        JSR CreateDreadnoughtForCurrentLevel	
+        JSR ClearSurfaceStructureDataPtrArray
+        JSR UpdateScreenColors
+        ;JSR AddStarsToBackgroundBehindDreadnought
+        JSR ScrollShipSurface
+        JSR AddStarsBehindDreadnought
+        ;JSR GenerateStarfield
+;        LDA #$FB
+;        STA $D025    ;Sprite Multi-Color Register 0
+        LDA #$00
+        STA a34
+        STA mantaDirectionAndSpeed
+        STA a3F
+        STA a47
+        STA a46
+        STA a3E
+        STA hasShipBeenHit
+        LDA #$FF
+        STA a2D
+        LDA #$10
+        STA mantaShadowOffset
+        LDA #$05
+        STA a45
+        LDA #$59
+        STA newSpriteValue
+        LDA #$98
+        STA mantaCurrentYPos
+        LDA #$01
+        STA fireButtonDebounce
+        LDA BUTTON_DEBOUNCE
+        STA buttonPressDebounce
+;        LDA backgroundColor2
+;        STA $D02E    ;Sprite 7 Color
+;        LDA #$2F
+;        STA charsetSwitcher
+;        JSR SetInterrupToIRQInterrupt2
+        RTS
+
+;-------------------------------------------------------------------
+; UpdatePointersAndFetchSurfaceData
+;-------------------------------------------------------------------
+UpdatePointersAndFetchSurfaceData
+        LDY indexToCurrentLevelTextureData
+        LDA scoringStrategyForLevelLoPtrArray,Y
+        STA loPtrToEnemyFormationOrder
+        LDA scoringStrategyForLevelHiPtrArray,Y
+        STA hiPtrToEnemyFormationOrder
+
+        LDA #$00
+        STA formationAnnihilationBonus
+        STA landNowActivated
+        LDA #$80
+        STA usedToCheckIfWeShouldLaunchMine
+        STA whetherScoreAwardedForHittingEnemy
+        JSR FetchCurrentSurfaceData
+        RTS
+
+;-------------------------------------------------------------------
+; LoadSurfaceStructureData
+; Reads in the surface structure data
+; In fact it generates the pointers to the tile data
+;-------------------------------------------------------------------
+LoadSurfaceStructureData
+        LDX #<surfaceStructureData
+        LDY #>surfaceStructureData
+        STX srcLoPtr
+        STY srcHiPtr
+
+        LDX #$01
+UpdateTextureDataLoop   
+        LDY #$00
+        STY stashedYValue
+        LDA srcLoPtr
+        STA surfaceStructureDataLoPtrArray,X
+        LDA srcHiPtr
+        STA surfaceStructureDataHiPtrArray,X
+        INX
+        BEQ ReturnFromUpdatingPosition
+        LDA (srcLoPtr),Y
+        BEQ ReturnFromUpdatingPosition
+
+        STA initialValueOfY
+        INC stashedYValue
+b2C89   LDY stashedYValue
+        LDA (srcLoPtr),Y
+        SEC
+        ADC stashedYValue
+        STA stashedYValue
+        DEC initialValueOfY
+        BNE b2C89
+
+        LDA srcLoPtr
+        CLC
+        ADC stashedYValue
+        STA srcLoPtr
+        BCC UpdateTextureDataLoop
+        INC srcHiPtr
+        JMP UpdateTextureDataLoop
+
+ReturnFromUpdatingPosition
+	RTS
+
+;-------------------------------------------------------------------
+; ClearSurfaceStructureDataPtrArray
+;-------------------------------------------------------------------
+ClearSurfaceStructureDataPtrArray
+        LDA #$00
+        TAY
+b2CA8   STA surfaceStructureDataLoPtrArray,Y
+        STA surfaceStructureDataHiPtrArray,Y
+        INY
+        BNE b2CA8
+        RTS
+
+;-------------------------------------------------------------------
+; CreateDreadnoughtForCurrentLevel
+;-------------------------------------------------------------------
+CreateDreadnoughtForCurrentLevel
+	lda #0
+	sta dbgpos
+	lda indexToCurrentLevelTextureData
+	jsr puthex
+
+        LDA #$FF
+        STA someKindOfTextureColorVariable
+        LDA indexToCurrentLevelTextureData
+        AND #$0F
+        TAY
+        LDA dreadnoughtDataForLevelLoPtrArray,Y
+        STA dreadnoughtDataLoPtr
+        LDA dreadnoughtDataForLevelHiPtrArray,Y
+        STA dreadnoughtDataHiPtr
+
+        ; Fill the beginning and end of the dreadnought map
+        ; with spaces.
+        LDA #>(surfaceDataForCurrentLevel + $2000)
+        STA currentLevelSurfaceDataHiPtr
+        LDA #<(surfaceDataForCurrentLevel + $2000)
+        STA currentLevelSurfaceDataLoPtr
+b2CCD   LDY #$3F
+        LDA #$20
+b2CD1   STA (currentLevelSurfaceDataLoPtr),Y
+        DEY
+        BPL b2CD1
+        DEC currentLevelSurfaceDataHiPtr
+        DEC currentLevelSurfaceDataHiPtr
+        LDA currentLevelSurfaceDataHiPtr
+        CMP #>surfaceDataForCurrentLevel
+        BCS b2CCD
+
+        ; dreadnoughtData gives us an index into surfaceStructureDataLoPtrArray. 
+        ; We use this textureData to write the structure of an object
+        ; built from charsets into currentLevelSurfaceData. 
+
+        LDX #<startOfSurfaceDataForCurrentLevel
+        LDY #>startOfSurfaceDataForCurrentLevel
+        STX currentLevelSurfaceDataLoPtr
+        STY currentLevelSurfaceDataHiPtr
+
+        ; Each objec
+DrawSurfaceSectionsLoop   
+        ; Get the next structure in the dreadnought data.
+        LDY #$00
+        LDA (dreadnoughtDataLoPtr),Y
+        ; If we've hit a '00' do a special read of the '01' structure before
+        ; moving on to the next section of the dreadnought data in DrawPlacedStructures.
+        BEQ ReachedEndOfSurfaceSections
+        TAX                           ; Make it an index into surfaceStructureDataLoPtrArray
+        ; Get the object structure from textureData.
+        LDA surfaceStructureDataHiPtrArray,X
+        STA srcHiPtr
+        LDA surfaceStructureDataLoPtrArray,X
+        STA srcLoPtr
+        CLC
+        ; Move to the next structure in dreadnought data, for the next time around..
+        LDA dreadnoughtDataLoPtr
+        ADC #$01
+        STA dreadnoughtDataLoPtr
+        BCC ReadSurfaceSection
+        INC dreadnoughtDataHiPtr
+
+numberOfStrips = initialValueOfY
+        ; Read in and interpret the object structure.
+ReadSurfaceSection   
+        LDA (srcLoPtr),Y                ; Get the first value, the length of the object.
+        INY                             ; Move to the next value.
+        STA numberOfStrips
+
+        ; Point ramLo/HiPtr to currentLevelSurfaceData for writing out the surface data.
+DrawSectionStrip   
+        LDA currentLevelSurfaceDataLoPtr
+        STA ramLoPtr
+        LDA currentLevelSurfaceDataHiPtr
+        STA ramHiPtr
+
+        LDA (srcLoPtr),Y   ; Read in the run-length of the data.
+        INY                ; Move index to next position.
+        AND #$1F           ; Cap length to 31.
+        TAX                ; Store the run-length in X.
+ReadSectionBytes   
+        LDA (srcLoPtr),Y   ; Get a charset value from the object.
+        INY                ; Increment Y.
+        STY stashedYValue  ; Stash Y.
+        LDY #$00           ; 
+        STA (ramLoPtr),Y   ; Store the charset value in currentLevelSurfaceData.
+
+        LDY stashedYValue  ; Restore Y.
+        DEC ramHiPtr       ; Move up to the next position in the strip (i.e. 512 bytes) ..
+        DEC ramHiPtr       ; .. by decrementing the high pointer twice.
+        DEX
+        BNE ReadSectionBytes ; Loop until all data read.
+
+        ; Fill any remaining space with blank spaces.
+BlankSpacesLoop   
+        LDA ramHiPtr
+        CMP #>surfaceDataForCurrentLevel
+        BCC GoToNextSection
+        STY stashedYValue
+        LDY #$00
+        LDA #SPACE
+        STA (ramLoPtr),Y
+        LDY stashedYValue
+        DEC ramHiPtr ; Move up to the next position in the strip (i.e. 512 bytes) ..
+        DEC ramHiPtr ; .. by decrementing the high pointer twice.
+        JMP BlankSpacesLoop
+
+        ; Do the next strip.
+GoToNextSection
+        CLC
+        LDA currentLevelSurfaceDataLoPtr
+        ADC #$01
+        STA currentLevelSurfaceDataLoPtr
+        BCC b2D4B
+        INC currentLevelSurfaceDataHiPtr
+b2D4B   LDA currentLevelSurfaceDataHiPtr
+        CMP #>surfaceStructureDataLoPtrArray
+        BCS DrawPlacedStructures
+        DEC numberOfStrips
+        BNE DrawSectionStrip
+        BEQ DrawSurfaceSectionsLoop
+
+ReachedEndOfSurfaceSections   
+        LDA surfaceStructureDataLoPtrArray + $01
+        STA srcLoPtr
+        LDA surfaceStructureDataHiPtrArray + $01
+        STA srcHiPtr
+        LDY #$00
+        JMP ReadSurfaceSection
+
+        ; Read in the structures that have a defined position.
+DrawPlacedStructures   
+        LDY #$00
+        CLC
+        LDA dreadnoughtDataLoPtr
+        ADC #$01
+        STA dreadnoughtDataLoPtr
+        BCC ReadPlacedStructure
+        INC dreadnoughtDataHiPtr
+
+ReadPlacedStructure   
+        ; Read in the High Pointer Byte
+        LDA (dreadnoughtDataLoPtr),Y
+	clc
+	adc #$1C
+;        ORA #$80
+;        AND #$BF
+        STA currentLevelSurfaceDataHiPtr
+        CMP #>surfaceStructureDataLoPtrArray ; If we a high pointer not pointing to an area within the array, bail.
+        BCS FinishSurfaceAndReturn
+
+        ; Read in the Low Pointer Byte
+        INY
+        LDA (dreadnoughtDataLoPtr),Y
+        STA currentLevelSurfaceDataLoPtr
+
+        ; Read in the index to a surface structure.
+        INY
+        LDA (dreadnoughtDataLoPtr),Y
+        BEQ FinishSurfaceAndReturn
+        TAX
+        LDA surfaceStructureDataHiPtrArray,X
+        STA srcHiPtr
+        LDA surfaceStructureDataLoPtrArray,X
+        STA srcLoPtr
+
+        ; Move index forward 3 bytes to the next substructure.
+        CLC
+        LDA dreadnoughtDataLoPtr
+        ADC #$03
+        STA dreadnoughtDataLoPtr
+        BCC b2D9F
+        INC dreadnoughtDataHiPtr
+
+       ; Read the structure data pointed to by the index.
+b2D9F   
+        LDY #$00
+        LDA (srcLoPtr),Y
+        INY
+        STA numberOfStrips
+
+        ; Process each strip in the structure.
+ProcessStrip   
+        LDA currentLevelSurfaceDataLoPtr
+        STA ramLoPtr
+        LDA currentLevelSurfaceDataHiPtr
+        STA ramHiPtr
+        LDA (srcLoPtr),Y
+        INY
+
+        ; Process each character in the strip. 
+        AND #$1F
+        TAX
+ProcessCharacterInStrip   
+        LDA (srcLoPtr),Y
+        INY
+        STY stashedYValue
+        LDY #$00
+        CMP #SPACE
+        BEQ b2DC1
+        STA (ramLoPtr),Y
+b2DC1   JSR SomeKindOfFixUpToTheSurfaceData
+        LDY stashedYValue
+        DEC ramHiPtr ; Move up to the next position in the strip (i.e. 512 bytes) ..
+        DEC ramHiPtr ; .. by decrementing the high pointer twice.
+        BPL FinishSurfaceAndReturn
+        DEX
+        BNE ProcessCharacterInStrip
+
+        ; Go to the next strip
+        CLC
+        LDA currentLevelSurfaceDataLoPtr
+        ADC #$01
+        STA currentLevelSurfaceDataLoPtr
+        BCC b2DDA
+        INC currentLevelSurfaceDataHiPtr
+b2DDA   DEC numberOfStrips
+        BNE ProcessStrip
+
+        ; Go to the next substructure.
+        LDY #$00
+        JMP ReadPlacedStructure
+
+FinishSurfaceAndReturn   
+        RTS
+
+
+;-------------------------------------------------------------------
+; FetchCurrentSurfaceData
+;-------------------------------------------------------------------
+FetchCurrentSurfaceData
+;       SEI
+        LDA #$24
+        STA RAM_ACCESS_MODE
+        LDY indexToCurrentLevelTextureData
+        LDA levelSurfaceDataHiPtrArray,Y
+        STA tempHiPtrCopyFrom
+        LDA #$00
+        STA tempLoPtrCopyFrom
+        STA tempLoPtrCopyTo
+        LDA #>initialPositionOfMiniGameScreenData
+        STA tempHiPtrCopyTo
+        LDX #$04
+        JSR CopyDataUntilXIsZero
+        LDA #$25
+        STA RAM_ACCESS_MODE
+;       CLI
+        RTS
+	
+;-------------------------------------------------------------------
+; UpdateScreenColors
+;-------------------------------------------------------------------
+UpdateScreenColors
+	rts
+
+;-------------------------------------------------------------------
+; SomeKindOfFixUpToTheSurfaceData
+;-------------------------------------------------------------------
+SomeKindOfFixUpToTheSurfaceData
+        CMP #$59
+        BCC b2E16
+        CMP #$5C
+        BCS b2E16
+        LDY someKindOfTextureColorVariable
+        INY
+        CPY #$10
+        BCS b2E16
+        STY someKindOfTextureColorVariable
+        LDA ramHiPtr
+        AND #$01
+        STA $0230,Y
+        LDA ramHiPtr
+        SEC
+        SBC #$82
+        CLC
+        ADC #$0C
+        LSR
+        STA $0220,Y
+        LDA ramLoPtr
+        STA $0210,Y
+        ROR
+        STA $0200,Y
+        LDA #$FF
+        STA $0240,Y
+b2E16   RTS
+
+
+;-------------------------------------------------------------------
+; FirePlayerBullets
+;-------------------------------------------------------------------
+FirePlayerBullets
+        LDA fireButtonDebounce
+        ORA #$80
+        STA fireButtonDebounce
+
+        ; Fire the top bullet.
+        LDX newSpriteValue
+        LDA levelColorScheme + $01,X
+        BEQ b2993
+        CLC
+        ADC mantaCurrentYPos
+        SEC
+        SBC #$62
+        STA pixelYPositionOfPlayerBullet
+        LDX #$00
+        JSR GetFreeSlotForBullets
+        BCS b2993
+        STX dataIndex
+        JSR UpdateBulletArrays
+
+        ; Fire the bottom bullet.
+        LDX newSpriteValue
+        LDA levelColorScheme + 47,X
+        BEQ b2993
+        CLC
+        ADC mantaCurrentYPos
+        SEC
+        SBC #$62
+        STA pixelYPositionOfPlayerBullet
+        LDX dataIndex
+        JSR GetFreeSlotForBullets
+        BCS b2993
+        JSR UpdateBulletArrays
+b2993   RTS
+
+;-------------------------------------------------------------------
+; GetFreeSlotForBullets
+;-------------------------------------------------------------------
+GetFreeSlotForBullets
+        LDA playerBulletSlotArray,X
+        BEQ b299F
+        INX
+        CPX #$06
+        BCC GetFreeSlotForBullets
+        RTS
+
+b299F   CLC
+        RTS
+;-------------------------------------------------------------------
+; UpdateBulletArrays
+;-------------------------------------------------------------------
+UpdateBulletArrays
+        LDA #$09
+        STA soundVariable1
+        LDA #$02
+        LDY mantaDirectionAndSpeed
+        BEQ b29DF
+        BMI b29DF
+
+        ; Create a right-firing bullet.
+        LDA #$FE
+        STA playerBulletSlotArray,X
+        LDA mantaTopCannonLoPtr
+        STA playerBulletRamLoPtrArray,X
+        STA colorRamLoPtr
+
+        LDA pixelYPositionOfPlayerBullet
+        AND #$07
+        CMP #$07
+        BNE b29C3
+        LDA #$06
+b29C3   STA bulletOffsetsInCharsetDef,X
+        LDA pixelYPositionOfPlayerBullet
+        LSR
+        LSR
+        AND #$FE
+        STA pixelYPositionOfPlayerBullet
+        LDA mantaTopCannonHiPtr
+        AND #$01
+        CLC
+        ADC pixelYPositionOfPlayerBullet
+        ADC #$82
+        STA playerBulletRamHiPtrArray,X
+        STA colorRamHiPtr
+        JMP FinishedUpdatingBullets
+
+        ; Create a left-firing bullet.
+b29DF   STA playerBulletSlotArray,X
+        CLC
+        ADC mantaTopCannonLoPtr
+        STA playerBulletRamLoPtrArray,X
+        STA colorRamLoPtr
+        PHP
+        LDA pixelYPositionOfPlayerBullet
+        AND #$07
+        CMP #$07
+        BNE b29F5
+        LDA #$06
+b29F5   STA bulletOffsetsInCharsetDef,X
+        LDA pixelYPositionOfPlayerBullet
+        LSR
+        LSR
+        AND #$FE
+        STA pixelYPositionOfPlayerBullet
+        LDA mantaTopCannonHiPtr
+        AND #$01
+        CLC
+        ADC pixelYPositionOfPlayerBullet
+        PLP
+        ADC #$82
+        STA playerBulletRamHiPtrArray,X
+        STA colorRamHiPtr
+
+FinishedUpdatingBullets
+        LDY #$00
+        LDA (colorRamLoPtr),Y
+        STA charBehindPlayerBulletArray,X
+        RTS
+	
+;-------------------------------------------------------------------
+; CopyDataUntilXIsZero
+;-------------------------------------------------------------------
+CopyDataUntilXIsZero
+        LDY #$00
+        JSR CopyDataUntilYIsZero
+        INC tempHiPtrCopyFrom
+        INC tempHiPtrCopyTo
+        DEX
+        BNE CopyDataUntilXIsZero
+        RTS
+	
+;-------------------------------------------------------------------
+; CopyDataUntilYIsZero
+;-------------------------------------------------------------------
+CopyDataUntilYIsZero
+        LDA (tempLoPtrCopyFrom),Y
+        STA (tempLoPtrCopyTo),Y
+        DEY
+        BNE CopyDataUntilYIsZero
+        LDA (tempLoPtrCopyFrom),Y
+        STA (tempLoPtrCopyTo),Y
+        RTS
+	
+;-------------------------------------------------------------------
+; WasteCyclesUsingXAndY
+;-------------------------------------------------------------------
+WasteCyclesUsingXAndY
+        DEX
+        BNE WasteCyclesUsingXAndY
+        DEY
+        BNE WasteCyclesUsingXAndY
+        RTS
+
+;-------------------------------------------------------------------
+; GetJoystickInput
+;-------------------------------------------------------------------
+GetJoystickInput
+        LDA #$00
+        STA upPressed
+        STA rightPressed
+;        LDA #$FF
+;        STA $DC00    ;CIA1: Data Port Register A
+joystick1LoPtr   =*+$01
+joystick1HiPtr   =*+$02
+	lda porta
+;        LDA $DC00    ;CIA1: Data Port Register A
+joystick2LoPtr   =*+$01
+joystick2HiPtr   =*+$02
+;        AND $DC01    ;CIA1: Data Port Register B
+        BIT msbForSpriteArray + $02
+        BEQ bB037
+        BIT msbForSpriteArray + $03
+        BEQ bB03B
+        JMP jB03D
+
+bB037   DEC rightPressed
+        BNE jB03D
+bB03B   INC rightPressed
+jB03D   BIT msbForSpriteArray
+        BEQ bB04A
+        BIT msbForSpriteArray + $01
+        BEQ bB04E
+        JMP jB050
+
+bB04A   DEC upPressed
+        BNE jB050
+bB04E   INC upPressed
+jB050   lda trig0
+;	AND #$10
+	AND #$01
+        STA firePressed
+        RTS
+
+;-------------------------------------------------------------------
+; Write21LinesOfAccumulatorValToScreen
+;-------------------------------------------------------------------
+Write21LinesOfAccumulatorValToScreen
+        LDX #<SCREEN_RAM_HIBANK + $00A0
+        LDY #>SCREEN_RAM_HIBANK + $00A0
+        STX ramLoPtr
+        STY ramHiPtr
+        LDX #$15
+        JSR WriteToRam
+        RTS
+	
+;-------------------------------------------------------------------
+; WriteToRam
+;-------------------------------------------------------------------
+WriteToRam
+        STA currentSpriteColor
+jB18B   LDY #$00
+bB18D   STA (ramLoPtr),Y
+        INY
+        CPY #$28
+        BCC bB18D
+        DEX
+        BEQ bB1A7
+        CLC
+        LDA ramLoPtr
+        ADC #$28
+        STA ramLoPtr
+        BCC bB1A2
+        INC ramHiPtr
+bB1A2   LDA currentSpriteColor
+        JMP jB18B
+
+bB1A7   CLC
+        CLC
+        LDA ramLoPtr
+        ADC #$28
+        STA ramLoPtr
+        BCC bB1B3
+        INC ramHiPtr
+bB1B3   RTS
+
+;-------------------------------------------------------------------
+; WriteSourceValueToRam
+;-------------------------------------------------------------------
+WriteSourceValueToRam
+        STY initialValueOfY
+b23A7   LDY initialValueOfY
+        LDA (srcLoPtr),Y
+        LDX #$01
+        JSR WriteToRam
+        DEC initialValueOfY
+        BPL b23A7
+        RTS
+	
+;
 
 ;-------------------------------------------------------------------
 ; AnimatePlayerBullet
@@ -642,42 +1756,42 @@ ScrollShipSurface
         LDA #>surfaceDataForCurrentLevel
         ORA secondHalfOfMap
         STA scrollPositionHiPtr
-        STA surfaceDataForCurrentLevelHiPtr
+;        STA surfaceDataForCurrentLevelHiPtr
         LDA scrollPositionLoPtr
-        STA surfaceDataForCurrentLevelLoPtr
+;        STA surfaceDataForCurrentLevelLoPtr
 
-        LDA #>(SCREEN_RAM_HIBANK + $00F0)
-        STA screenRAMToDrawHiPtr
-        LDA #<(SCREEN_RAM_HIBANK + $00F0)
-        STA screenRAMToDrawLoPtr
-
-        LDX #$11
-DrawScrollingSurfaceRows   
-        LDY #$26
-DrawRowOfScrollingSurface   
-
-surfaceDataForCurrentLevelLoPtr   =*+$01
-surfaceDataForCurrentLevelHiPtr   =*+$02
-        LDA surfaceDataForCurrentLevel,Y
-screenRAMToDrawLoPtr   =*+$01
-screenRAMToDrawHiPtr   =*+$02
-        STA SCREEN_RAM_HIBANK + $00F0,Y
-
-        DEY
-        BPL DrawRowOfScrollingSurface
-
-        DEX
-        BEQ FinishScrollingAndCleanUp
-        INC surfaceDataForCurrentLevelHiPtr
-        INC surfaceDataForCurrentLevelHiPtr
-        LDA screenRAMToDrawLoPtr
-        CLC
-        ADC #$28
-        STA screenRAMToDrawLoPtr
-        BCC DrawScrollingSurfaceRows
-        INC screenRAMToDrawHiPtr
-
-        JMP DrawScrollingSurfaceRows
+;        LDA #>(SCREEN_RAM_HIBANK + $00F0)
+;        STA screenRAMToDrawHiPtr
+;        LDA #<(SCREEN_RAM_HIBANK + $00F0)
+;        STA screenRAMToDrawLoPtr
+;
+;        LDX #$11
+;DrawScrollingSurfaceRows   
+;        LDY #$26
+;DrawRowOfScrollingSurface   
+;
+;surfaceDataForCurrentLevelLoPtr   =*+$01
+;surfaceDataForCurrentLevelHiPtr   =*+$02
+;        LDA surfaceDataForCurrentLevel,Y
+;screenRAMToDrawLoPtr   =*+$01
+;screenRAMToDrawHiPtr   =*+$02
+;        STA SCREEN_RAM_HIBANK + $00F0,Y
+;
+;        DEY
+;        BPL DrawRowOfScrollingSurface
+;
+;        DEX
+;        BEQ FinishScrollingAndCleanUp
+;        INC surfaceDataForCurrentLevelHiPtr
+;        INC surfaceDataForCurrentLevelHiPtr
+;        LDA screenRAMToDrawLoPtr
+;        CLC
+;        ADC #$28
+;        STA screenRAMToDrawLoPtr
+;        BCC DrawScrollingSurfaceRows
+;        INC screenRAMToDrawHiPtr
+;
+;        JMP DrawScrollingSurfaceRows
 
 FinishScrollingAndCleanUp
         ; Update the stored positions of the player's cannon.
@@ -712,7 +1826,7 @@ FinishScrollingAndCleanUp
 ; AddStarsBehindDreadnought
 ;-------------------------------------------------------------------
 AddStarsBehindDreadnought
-		rts
+	rts
 
 
 ;-------------------------------------------------------------------
@@ -1047,6 +2161,8 @@ b1BF4   DEC dataIndex
 ; ApplySpriteVariablesAndDisplay
 ;-------------------------------------------------------------------
 ApplySpriteVariablesAndDisplay
+	jmp DisplayCurrentSprite
+	
         LDY spriteIndex
         LDA msbForSpriteArray,Y
         STA currentSpriteMSB
@@ -1092,6 +2208,22 @@ bB13C   STA $D01B    ;Sprite to Background Display Priority
 ;-------------------------------------------------------------------
 DisplayCurrentSprite
         LDY spriteIndex
+	
+	lda currentSpriteDisplayEnable
+	sta spriteEna,y
+	lda currentSpriteValue
+	sta spriteShape,y
+	lda #1
+	sta spriteModus,y
+	lda currentSpriteMSBXPosOffset
+	lsr
+	lda currentSpriteXPos
+	ror
+	sta spriteXpos,y
+	lda currentSpriteYPos
+	sta spriteYpos,y
+	rts
+	
         LDA msbForSpriteArray,Y
         STA currentSpriteMSB
         EOR #$FF
@@ -1125,63 +2257,302 @@ bB180   LDA $D015    ;Sprite display Enable
         AND spriteMixerValue
 bB185   STA $D015    ;Sprite display Enable
         RTS	
+	
+;--------------------------------------------------------------------
+; MaybeStartNewLevel
+;--------------------------------------------------------------------
+MaybeStartNewLevel
+        LDA currentLevel
+        CMP indexToCurrentLevelTextureData
+        BEQ CheckIfGameIsOver
+        STA indexToCurrentLevelTextureData
+        CMP #$10
+        BCC b0D62
+        LDA #$01
+        STA currentLevel
+        STA indexToCurrentLevelTextureData
+
+        LDA selectForBulletsOrMines
+        CLC
+        ADC #$10
+        CMP #$40
+        BCS b0D62
+        STA selectForBulletsOrMines
+
+b0D62   LDA #$00
+        STA indexCurrentEnemyFormation
+        JMP EnterNewLevel
+        ; Doesn't return here, enters main game loop.
+	
+	
+CheckIfGameIsOver
+	jmp CheckIfGameIsOver
+		
+;-------------------------------------------------------------------
+; SpinWaitingForJoystickInput
+;-------------------------------------------------------------------
+SpinWaitingForJoystickInput
+        LDA #$08
+        STA initialValueOfY
+bB276   JSR GetJoystickInput
+        LDY #$08
+        JSR WasteCyclesUsingXAndY
+        LDA firePressed
+        BEQ SpinWaitingForJoystickInput
+        DEC initialValueOfY
+        BNE bB276
+        RTS
+	
+;-------------------------------------------------------------------
+; LoadSpriteVariablesAndDisplay
+;-------------------------------------------------------------------
+LoadSpriteVariablesAndDisplay
+        ; Load the variables from spriteIndex to currentSpriteColor
+        ; with the values from spriteVariablesLoPtr
+        LDY #$0A
+bB289   LDA (spriteVariablesLoPtr),Y
+        STA spriteIndex,Y
+        DEY
+        BPL bB289
+
+        JSR ApplySpriteVariablesAndDisplay
+        RTS
+
+;-------------------------------------------------------------------
+; MaybeFirePlayerBullets
+;-------------------------------------------------------------------
+MaybeFirePlayerBullets
+        LDA fireButtonDebounce
+        BMI b2954
+        BEQ b2943
+BUTTON_DEBOUNCE   =*+$01
+        LDA #$07
+        STA buttonPressDebounce
+        LDA firePressed
+        BNE b2942
+        STA fireButtonDebounce
+        JSR FirePlayerBullets
+b2942   RTS
+
+b2943   LDA firePressed
+        BEQ b294D
+        INC fireButtonDebounce
+        JSR FirePlayerBullets
+        RTS
+
+b294D   LDA buttonPressDebounce
+        BMI b2942
+        DEC buttonPressDebounce
+        RTS
+
+b2954   AND #$7F
+        STA fireButtonDebounce
+        RTS
+
+;--------------------------------------------------------------------
+; b2617
+;--------------------------------------------------------------------
+b2617
+        BMI b2627
+        CLC
+        ADC a2D
+        STA a2D
+        LDA mantaDirectionAndSpeed
+        ADC #$00
+        BMI b2650
+        JMP j2679
+
+b2627   CLC
+        ADC a2D
+        STA a2D
+        LDA mantaDirectionAndSpeed
+        ADC #$FF
+        BMI b2650
+        JMP j2679
+
+;-------------------------------------------------------------------
+; MaybeMoveRight
+;-------------------------------------------------------------------
+MaybeMoveRight
+        LDA a3F
+        BNE b2617
+        LDA a45
+        AND #$04
+        BNE b2668
+        LDA rightPressed
+        BEQ b2659
+        BMI b265A
+        LDA a2D
+        CLC
+        ADC a39
+        STA a2D
+        LDA mantaDirectionAndSpeed
+        ADC #$FF
+b2650   STA mantaDirectionAndSpeed
+        EOR #$FF
+        CLC
+        ADC #$01
+        STA a3E
+b2659   RTS
+
+b265A   LDA a2D
+        CLC
+        ADC a3A
+        STA a2D
+        LDA mantaDirectionAndSpeed
+        ADC #$00
+        JMP b2650
+
+b2668   LDA rightPressed
+        BEQ b2659
+        BPL b267E
+        LDA a2D
+        CLC
+        ADC a3B
+        STA a2D
+        LDA mantaDirectionAndSpeed
+        ADC #$00
+j2679
+        STA mantaDirectionAndSpeed
+        STA a3E
+        RTS
+
+b267E   LDA a2D
+        CLC
+        ADC a3C
+        STA a2D
+        LDA mantaDirectionAndSpeed
+        ADC #$FF
+        JMP j2679
+
+;-------------------------------------------------------------------
+; MaybeMoveLeft
+;-------------------------------------------------------------------
+MaybeMoveLeft
+        LDA buttonPressDebounce
+        BEQ b25B0
+b257A   LDA upPressed
+        BEQ b259E
+        BMI b258F
+        INC a34
+        LDA a34
+        BMI b258E
+        CMP a36
+        BCC b258E
+        LDA a36
+        STA a34
+b258E   RTS
+
+b258F   DEC a34
+        LDA a34
+        BPL b258E
+        CMP a35
+        BCS b258E
+        LDA a35
+        STA a34
+        RTS
+
+b259E   LDA a34
+        CMP #$FF
+        BEQ b25AB
+        ROL
+        LDA a34
+        ROR
+        STA a34
+        RTS
+
+b25AB   LDA #$00
+        STA a34
+        RTS
+
+b25B0   LDA upPressed
+        BNE b25B9
+        INC buttonPressDebounce
+        JMP b259E
+
+b25B9   LDA a3F
+        BNE b257A
+        LDA a45
+        BMI b257A
+        AND #$03
+        CMP #$01
+        BNE b25DF
+        CLC
+        ADC upPressed
+        AND #$03
+        ORA #$80
+        STA a0F
+        LDA a3E
+        CMP #$03
+        BCC b257A
+b25D6   LDA a45
+        AND #$FC
+        ORA a0F
+        STA a46
+        RTS
+
+b25DF   LDA #$81
+        STA a0F
+        BNE b25D6
+        ; Never Falls through
+	
 ;------------------------------------------------------------
 ; main loop
 ;------------------------------------------------------------
-mainloop	lda #112
-		jsr waitvcnt
-
-		inc rtclok
-
-;		lda #10
-;		sta colbk
-		
-		lda #0
-		sta dbgpos
-;		lda dreadXpos+1
-;		jsr puthex
-;		lda dreadXpos
-;		jsr puthex
-		
-		jsr keyboard
-
-		lda dead
-		beq mainloop1
-		jsr explosion
-		jmp mainloop2
-		
-mainloop1	lda rtclok
-		and #$07
-		tay
-		lda screenWriteJumpTableHiPtr,Y
-		sta mainGameLoopHiPtr
-		lda screenWriteJumpTableLoPtr,Y
-		sta mainGameLoopLoPtr
-mainGameLoopLoPtr   =*+$01
-mainGameLoopHiPtr   =*+$02
-		jsr MaybeChangeTitleDecal
-		
-mainloop2	jsr char2title
-		jsr char2gfx
-		jsr stars2gfx
-		jsr renderSprites		
-		jsr moveBullets
-		
-		jsr checkstick
-		jsr checkfire
-		jsr moveShaft
-		jsr scrollSurface
-
-		jsr collision
-		jsr updateManta		
-		
-		jsr getstart
-		jsr getselect
-		jsr getoption
-
-;		lda #$00
-;		sta colbk
-		jmp mainloop
+;mainloop	lda #112
+;		jsr waitvcnt
+;
+;		inc rtclok
+;
+;;		lda #10
+;;		sta colbk
+;		
+;		lda #0
+;		sta dbgpos
+;;		lda dreadXpos+1
+;;		jsr puthex
+;;		lda dreadXpos
+;;		jsr puthex
+;		
+;		jsr keyboard
+;
+;		lda dead
+;		beq mainloop1
+;		jsr explosion
+;		jmp mainloop2
+;		
+;mainloop1	lda rtclok
+;		and #$07
+;		tay
+;		lda screenWriteJumpTableHiPtr,Y
+;		sta mainGameLoopHiPtr
+;		lda screenWriteJumpTableLoPtr,Y
+;		sta mainGameLoopLoPtr
+;mainGameLoopLoPtr   =*+$01
+;mainGameLoopHiPtr   =*+$02
+;		jsr MaybeChangeTitleDecal
+;		
+;mainloop2	jsr char2title
+;		jsr char2gfx
+;		jsr stars2gfx
+;		jsr renderSprites		
+;		jsr moveBullets
+;		
+;		jsr checkstick
+;		jsr checkfire
+;		jsr moveShaft
+;		jsr scrollSurface
+;
+;		jsr collision
+;		jsr updateManta		
+;		
+;		jsr getstart
+;		jsr getselect
+;		jsr getoption
+;
+;;		lda #$00
+;;		sta colbk
+;		jmp mainloop
 
 ;-------------------------------------------------------------------
 ; MaybeChangeTitleDecal
@@ -1200,17 +2571,17 @@ ChangeDecal1	clc
 		lda rtclok
 		and #$7F
 		bne b231C
-		lda decalState
-		;sta a0F
+		lda a5B
+		sta a0F
 		clc
 		adc #$01
 		and #$03
-		sta decalState
+		sta a5B
 		beq b231D					;uridium
 		lda pause
 		cmp #$03
 		beq b231D
-		lda decalState
+		lda a5B
 		cmp #$01
 		beq b2325
 		cmp #$02
@@ -1253,8 +2624,8 @@ b232D   	ldx #<inGameBanner
 		jsr WriteToScreen
 		rts
 
-b2335   	;LDY indexToCurrentLevelTextureData
-		ldy currentLevel
+b2335   	LDY indexToCurrentLevelTextureData
+		;ldy currentLevel
 		ldx levelNameLoPtrArray,Y
 		lda levelNameHiPtrArray,Y
 		tay
@@ -1263,6 +2634,9 @@ b2335   	;LDY indexToCurrentLevelTextureData
 
 UpdateAndDisplaySomeSprites
 		rts
+		
+currentScoreCharToWrite = a0F
+currentDigitInScore = dataIndex
 ;-------------------------------------------------------------------
 ; UpdatePlayerScore
 ;-------------------------------------------------------------------
@@ -1355,330 +2729,330 @@ UpdateCurrentColorValue
 ;--------------------------------------------------------------------
 ;
 ;--------------------------------------------------------------------
-moveShaft	ldx #1
-moveShaft3	lda minePos0,x
-		sta hposp2,x
-		beq moveShaft4
-		
-		clc
-		ldy hspeed
-		bmi movecheckShaft
-
-moveShaftRight	adc hspeed
-		cmp #204
-		bcs moveShaft1
-		bcc moveShaft2
-
-movecheckShaft	adc hspeed
-		cmp #44
-		bcs moveShaft2
-		
-moveShaft1	lda #0
-moveShaft2	sta minePos0,x
-moveShaft4	dex
-		bpl moveShaft3
-
-moveShaftEx	rts
+;moveShaft	ldx #1
+;moveShaft3	lda minePos0,x
+;		sta hposp2,x
+;		beq moveShaft4
+;		
+;		clc
+;		ldy hspeed
+;		bmi movecheckShaft
+;
+;moveShaftRight	adc hspeed
+;		cmp #204
+;		bcs moveShaft1
+;		bcc moveShaft2
+;
+;movecheckShaft	adc hspeed
+;		cmp #44
+;		bcs moveShaft2
+;		
+;moveShaft1	lda #0
+;moveShaft2	sta minePos0,x
+;moveShaft4	dex
+;		bpl moveShaft3
+;
+;moveShaftEx	rts
 
 ;--------------------------------------------------------------------
 ;
 ;--------------------------------------------------------------------
-shaftRight	lda #0
-                sta checkShaft2+1
-                lda #48
-                sta checkShaft9+1
-		bne checkShaft
-
-;--------------------------------------------------------------------
+;shaftRight	lda #0
+;                sta checkShaft2+1
+;                lda #48
+;                sta checkShaft9+1
+;		bne checkShaft
 ;
-;--------------------------------------------------------------------
-shaftLeft	lda #39
-		sta checkShaft2+1
-		lda #204
-		sta checkShaft9+1
-
-;--------------------------------------------------------------------
+;;--------------------------------------------------------------------
+;;
+;;--------------------------------------------------------------------
+;shaftLeft	lda #39
+;		sta checkShaft2+1
+;		lda #204
+;		sta checkShaft9+1
 ;
-;--------------------------------------------------------------------
-checkShaft	lda dreadXPos
-		sta ptr
-		lda dreadXPos+1
-		sta ptr+1
-	
-		ldx #0
-checkShaft2	ldy #39
-		lda (ptr),y
-;		cmp #$d7
-;		beq checkShaft4
-		cmp #$59					;mine shaft $58-5A
-		bcc checkShaft1
-		cmp #$5b+1
-		bcs checkShaft1
-		
-checkShaft4	ldy #1
-checkShaft6	lda minePos0,y
-		beq checkShaft5
-		dey
-		bpl checkShaft6
-		bmi checkShaft1
-		
-checkShaft5	lda hscrol
-		lsr
-checkShaft9	adc #204
-		sta minePos0,y
-		
-		stx temp
-		txa
-		asl
-		asl
-		asl
-		adc #72
-		tax
-
-		tya
-		adc #$ce
-		sta checkShaft7+2
-		sta checkShaft8+2
-		
-		lda #7
-		sta cnt
-		
-		lda p2Ypos,y
-		stx p2Ypos,y
-		tay
-
-checkShaft3	lda #0
-checkShaft7	sta $ce00,y
-		lda #$ff
-checkShaft8	sta $ce00,x
-		inx
-		iny
-		dec cnt
-		bpl checkShaft3
-		ldx temp
-		
-checkShaft1	inc ptr+1
-		inc ptr+1
-		inx
-		cpx #17
-		bne checkShaft2
-		
-checkShaftEx	rts
+;;--------------------------------------------------------------------
+;;
+;;--------------------------------------------------------------------
+;checkShaft	lda dreadXPos
+;		sta ptr
+;		lda dreadXPos+1
+;		sta ptr+1
+;	
+;		ldx #0
+;checkShaft2	ldy #39
+;		lda (ptr),y
+;;		cmp #$d7
+;;		beq checkShaft4
+;		cmp #$59					;mine shaft $58-5A
+;		bcc checkShaft1
+;		cmp #$5b+1
+;		bcs checkShaft1
+;		
+;checkShaft4	ldy #1
+;checkShaft6	lda minePos0,y
+;		beq checkShaft5
+;		dey
+;		bpl checkShaft6
+;		bmi checkShaft1
+;		
+;checkShaft5	lda hscrol
+;		lsr
+;checkShaft9	adc #204
+;		sta minePos0,y
+;		
+;		stx temp
+;		txa
+;		asl
+;		asl
+;		asl
+;		adc #72
+;		tax
+;
+;		tya
+;		adc #$ce
+;		sta checkShaft7+2
+;		sta checkShaft8+2
+;		
+;		lda #7
+;		sta cnt
+;		
+;		lda p2Ypos,y
+;		stx p2Ypos,y
+;		tay
+;
+;checkShaft3	lda #0
+;checkShaft7	sta $ce00,y
+;		lda #$ff
+;checkShaft8	sta $ce00,x
+;		inx
+;		iny
+;		dec cnt
+;		bpl checkShaft3
+;		ldx temp
+;		
+;checkShaft1	inc ptr+1
+;		inc ptr+1
+;		inx
+;		cpx #17
+;		bne checkShaft2
+;		
+;checkShaftEx	rts
 ;-------------------------------------------------------------------
 ; 
 ;-------------------------------------------------------------------
-MaybeFirePlayerBullets
-checkFire	lda bulletFlag
-		bmi checkFire1
-		beq checkFire3
-		
-		lda #$07
-		sta bulletCnt
-		lda firePressed
-		bne checkFire2
-		sta bulletFlag
-		jsr FireBullets
-checkFire2	rts
-		
-checkFire3	lda firePressed
-		beq checkFire4
-		inc bulletFlag
-		jsr FireBullets
-		rts
-		
-checkFire4	lda bulletCnt
-		bmi checkFire2
-		dec bulletCnt
-		rts
-
-checkFire1	and #$7F
-		sta bulletFlag
-		rts
+;myMaybeFirePlayerBullets
+;checkFire	lda bulletFlag
+;		bmi checkFire1
+;		beq checkFire3
+;		
+;		lda #$07
+;		sta bulletCnt
+;		lda firePressed
+;		bne checkFire2
+;		sta bulletFlag
+;		jsr FireBullets
+;checkFire2	rts
+;		
+;checkFire3	lda firePressed
+;		beq checkFire4
+;		inc bulletFlag
+;		jsr FireBullets
+;		rts
+;		
+;checkFire4	lda bulletCnt
+;		bmi checkFire2
+;		dec bulletCnt
+;		rts
+;
+;checkFire1	and #$7F
+;		sta bulletFlag
+;		rts
 	
 ;-------------------------------------------------------------------
 ; FireBullets
 ;-------------------------------------------------------------------
-FireBullets
-		lda bulletFlag
-		ora #$80
-		sta bulletFlag
-		;ldx newSpriteValue
-		;lda levelColorScheme + $01,X
-		;beq FireBulletsEx
-
-		lda mantaYpos					;a33
-		sec
-		sbc #19						;subtract offset so starts at 0
-		sta bulletYPos					;zp0F
-		ldx #$00
-		jsr GetFreeSlotForBullets
-		bcs FireBulletsEx
-		stx bulletSlotX
-		jsr UpdateBulletArrays
-
-		;ldx newSpriteValue
-		;lda bulletColorScheme,X
-		;beq FireBulletsEx
-
-		lda mantaYpos
-		sec
-		sbc #19
-		adc #15
-		sta bulletYPos
-		ldx bulletSlotX
-		jsr GetFreeSlotForBullets
-		bcs FireBulletsEx
-		jsr UpdateBulletArrays
-FireBulletsEx	rts
-
-;-------------------------------------------------------------------
-; GetFreeSlotForBullets
-;-------------------------------------------------------------------
-GetFreeSlotForBullets
-		lda bulletSlot,X
-		beq GetFreeSlotForBulletsEx
-		inx
-		cpx #$06
-		bcc GetFreeSlotForBullets
-		rts
-
-GetFreeSlotForBulletsEx	
-		clc
-		rts
-
-;-------------------------------------------------------------------
-; UpdateBulletArrays
-;-------------------------------------------------------------------
-UpdateBulletArrays
-		
-		lda dreadXPos
-		sta ptr
-		lda bulletYpos
-		lsr
-		lsr
-		and #$fe
-		clc
-		adc dreadXPos+1
-		sta ptr+1		
-	
-		lda #16
-		ldy spriteShape
-		cpy #$19
-		beq UpdateBulletArrays1
-		cpy #$01
-		bne UpdateBulletArraysEx
-		lda #19
-UpdateBulletArrays1
-		adc ptr
-		sta ptr
-		sta bulletPosLo,x
-		lda ptr+1
-		adc #0
-		sta ptr+1
-		sta bulletPosHi,x
-
-		lda bulletYPos
-		and #$07
-		cmp #$07
-		bne UpdateBulletArrays2
-		lda #$06
-UpdateBulletArrays2	
-		sta bulletCharY,x
-		
-		lda #2
-		ldy hspeed
-		bmi UpdateBulletArrays3
-		lda #$fe
-UpdateBulletArrays3		
-		sta bulletSlot,X
-
-		ldy #0
-		lda (ptr),y
-		sta bulletOldChar,x
-
-UpdateBulletArraysEx		
-		rts
+;FireBullets
+;		lda bulletFlag
+;		ora #$80
+;		sta bulletFlag
+;		;ldx newSpriteValue
+;		;lda levelColorScheme + $01,X
+;		;beq FireBulletsEx
+;
+;		lda mantaYpos					;a33
+;		sec
+;		sbc #19						;subtract offset so starts at 0
+;		sta bulletYPos					;zp0F
+;		ldx #$00
+;		jsr GetFreeSlotForBullets
+;		bcs FireBulletsEx
+;		stx bulletSlotX
+;		jsr UpdateBulletArrays
+;
+;		;ldx newSpriteValue
+;		;lda bulletColorScheme,X
+;		;beq FireBulletsEx
+;
+;		lda mantaYpos
+;		sec
+;		sbc #19
+;		adc #15
+;		sta bulletYPos
+;		ldx bulletSlotX
+;		jsr GetFreeSlotForBullets
+;		bcs FireBulletsEx
+;		jsr UpdateBulletArrays
+;FireBulletsEx	rts
+;
+;;-------------------------------------------------------------------
+;; GetFreeSlotForBullets
+;;-------------------------------------------------------------------
+;GetFreeSlotForBullets
+;		lda bulletSlot,X
+;		beq GetFreeSlotForBulletsEx
+;		inx
+;		cpx #$06
+;		bcc GetFreeSlotForBullets
+;		rts
+;
+;GetFreeSlotForBulletsEx	
+;		clc
+;		rts
+;
+;;-------------------------------------------------------------------
+;; UpdateBulletArrays
+;;-------------------------------------------------------------------
+;UpdateBulletArrays
+;		
+;		lda dreadXPos
+;		sta ptr
+;		lda bulletYpos
+;		lsr
+;		lsr
+;		and #$fe
+;		clc
+;		adc dreadXPos+1
+;		sta ptr+1		
+;	
+;		lda #16
+;		ldy spriteShape
+;		cpy #$19
+;		beq UpdateBulletArrays1
+;		cpy #$01
+;		bne UpdateBulletArraysEx
+;		lda #19
+;UpdateBulletArrays1
+;		adc ptr
+;		sta ptr
+;		sta bulletPosLo,x
+;		lda ptr+1
+;		adc #0
+;		sta ptr+1
+;		sta bulletPosHi,x
+;
+;		lda bulletYPos
+;		and #$07
+;		cmp #$07
+;		bne UpdateBulletArrays2
+;		lda #$06
+;UpdateBulletArrays2	
+;		sta bulletCharY,x
+;		
+;		lda #2
+;		ldy hspeed
+;		bmi UpdateBulletArrays3
+;		lda #$fe
+;UpdateBulletArrays3		
+;		sta bulletSlot,X
+;
+;		ldy #0
+;		lda (ptr),y
+;		sta bulletOldChar,x
+;
+;UpdateBulletArraysEx		
+;		rts
 
 
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-moveBullets
-		ldx #5
-		ldy #0
-		sty moveBullets3+1
-moveBullets2	lda bulletSlot,x
-		beq moveBullets1
-		bpl moveBullets4
-		lda #$ff
-		sta moveBullets3+1
-
-moveBullets4	lda bulletPosLo,x
-		sta ptr
-		lda bulletPosHi,x
-		sta ptr+1
-		lda bulletOldChar,x
-		sta (ptr),y
-
-		clc
-		lda bulletSlot,x
-		adc ptr
-		sta ptr
-		sta bulletPosLo,x
-		lda ptr+1
-moveBullets3	adc #0
-		sta ptr+1
-		sta bulletPosHi,x
-		
-		ror
-		lda ptr
-		ror
-		cmp leftbound
-		bcc moveBullets5
-		cmp rightbound
-		bcs moveBullets5
-
-		lda (ptr),y
-		bpl moveBullets6
-		cmp #$90
-		bcc moveBullets5
-		cmp #$A0
-		bcs moveBullets6
-		jsr checkHit
-		jmp moveBullets5
-		
-moveBullets6	sta bulletOldChar,x
-		
-		sty charSetPtr+1
-		asl
-		rol charSetPtr+1
-		asl
-		rol charSetPtr+1
-		asl
-		rol charSetPtr+1
-		clc
-		adc #<surfaceCharset
-		sta charSetPtr
-		lda charSetPtr+1
-		adc #>surfaceCharset
-		sta charSetPtr+1
-		tay
-		bpl moveBullets8
-		ldy currentLevel
-		adc charsetArray,y
-		sta charSetPtr+1
-		
-moveBullets8	jsr uploadChar
-		txa
-		sta (ptr),y
-
-moveBullets1	dex
-		bpl moveBullets2
-		rts
-		
-moveBullets5	lda #0
-		sta bulletSlot,x
-		beq moveBullets1
+;moveBullets
+;		ldx #5
+;		ldy #0
+;		sty moveBullets3+1
+;moveBullets2	lda bulletSlot,x
+;		beq moveBullets1
+;		bpl moveBullets4
+;		lda #$ff
+;		sta moveBullets3+1
+;
+;moveBullets4	lda bulletPosLo,x
+;		sta ptr
+;		lda bulletPosHi,x
+;		sta ptr+1
+;		lda bulletOldChar,x
+;		sta (ptr),y
+;
+;		clc
+;		lda bulletSlot,x
+;		adc ptr
+;		sta ptr
+;		sta bulletPosLo,x
+;		lda ptr+1
+;moveBullets3	adc #0
+;		sta ptr+1
+;		sta bulletPosHi,x
+;		
+;		ror
+;		lda ptr
+;		ror
+;		cmp leftbound
+;		bcc moveBullets5
+;		cmp rightbound
+;		bcs moveBullets5
+;
+;		lda (ptr),y
+;		bpl moveBullets6
+;		cmp #$90
+;		bcc moveBullets5
+;		cmp #$A0
+;		bcs moveBullets6
+;		jsr checkHit
+;		jmp moveBullets5
+;		
+;moveBullets6	sta bulletOldChar,x
+;		
+;		sty charSetPtr+1
+;		asl
+;		rol charSetPtr+1
+;		asl
+;		rol charSetPtr+1
+;		asl
+;		rol charSetPtr+1
+;		clc
+;		adc #<surfaceCharset
+;		sta charSetPtr
+;		lda charSetPtr+1
+;		adc #>surfaceCharset
+;		sta charSetPtr+1
+;		tay
+;		bpl moveBullets8
+;		ldy currentLevel
+;		adc charsetArray,y
+;		sta charSetPtr+1
+;		
+;moveBullets8	jsr uploadChar
+;		txa
+;		sta (ptr),y
+;
+;moveBullets1	dex
+;		bpl moveBullets2
+;		rts
+;		
+;moveBullets5	lda #0
+;		sta bulletSlot,x
+;		beq moveBullets1
 
 ;------------------------------------------------------------
 ;
@@ -1699,7 +3073,7 @@ uploadChar1	cpy temp
 		iny
 		lda #$aa
 		bne uploadChar3
-uploadChar2	lda (charSetPtr),y
+uploadChar2	lda (ptr),y
 uploadChar3	sta EGO_REG_DATA
 		iny
 		cpy #8
@@ -1710,50 +3084,50 @@ uploadChar3	sta EGO_REG_DATA
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-checkHit	sec
-		sbc #$90
-		tay
-		lda bulletPosLo,x
-		sbc hitPtrLo,y
-		sta ptr
-		lda bulletPosHi,x
-		sbc hitPtrHi,y
-		sta ptr+1
-
-		lda hitYlen,y
-		sta cnt
-		sta temp
-		
-		lda hitScore,Y
-		tay
-		jsr addScore
-		
-checkHit3	ldy temp
-checkHit1	lda (ptr),y
-		cmp #$20
-		bcc killBullet
-		cmp #$f0
-		bcs checkHit2
-		sec
-		sbc #$20
-		sta (ptr),y	
-checkHit2	dey
-		bpl checkHit1
-		dec cnt
-		bmi checkHitEx
-		inc ptr+1
-		inc ptr+1
-		jmp checkHit3
-
-checkHitEx	ldy #$00
-		rts
-
-killBullet	STX tempX
-		TAX
-		LDA #$00
-		STA bulletSlot,X
-		LDX tempX
-		JMP checkHit2
+;checkHit	sec
+;		sbc #$90
+;		tay
+;		lda bulletPosLo,x
+;		sbc hitPtrLo,y
+;		sta ptr
+;		lda bulletPosHi,x
+;		sbc hitPtrHi,y
+;		sta ptr+1
+;
+;		lda hitYlen,y
+;		sta cnt
+;		sta temp
+;		
+;		lda hitScore,Y
+;		tay
+;		jsr addScore
+;		
+;checkHit3	ldy temp
+;checkHit1	lda (ptr),y
+;		cmp #$20
+;		bcc killBullet
+;		cmp #$f0
+;		bcs checkHit2
+;		sec
+;		sbc #$20
+;		sta (ptr),y	
+;checkHit2	dey
+;		bpl checkHit1
+;		dec cnt
+;		bmi checkHitEx
+;		inc ptr+1
+;		inc ptr+1
+;		jmp checkHit3
+;
+;checkHitEx	ldy #$00
+;		rts
+;
+;killBullet	STX tempX
+;		TAX
+;		LDA #$00
+;		STA bulletSlot,X
+;		LDX tempX
+;		JMP checkHit2
 		
 ;-------------------------------------------------------------------
 ; checkHitsFromHittingStuff
@@ -1813,65 +3187,65 @@ keyboardEx	rts
 ;------------------------------------------------------------
 ; explosion
 ;------------------------------------------------------------
-explosion	lda dead
-		bmi explosion1
-
-		ldx #1
-		stx spriteModus+1
-		dex
-		stx mantajfy
-		stx spriteEna+1
-		stx turncnt
-		dex
-		stx dead
-		
-		ldx #7
-explosion3	jsr random3bit
-		adc mantaXPos
-		sta spriteXpos,x
-		jsr random4bit
-		adc mantaYpos
-		sta spriteYpos,x
-		lda #explosion_major46
-		sta spriteShape,x
-		lda #0
-		sta spriteEna,x
-		dex
-		bpl explosion3
-		rts
-
-explosion1	dec mantajfy
-		bpl explosionEx
-		lda #1
-		sta mantajfy
-		
-		ldx turncnt
-		cpx #8
-		bcs explosion9
-		inc spriteEna,x
-explosion9	cpx #19
-		bcc explosion5
-	
-		pla
-		pla
-		jmp restart
-		
-		
-explosion5	ldx #7
-explosion4	lda spriteEna,x
-		beq explosion6
-		lda spriteShape,x
-		cmp #explosion_major46+10
-		bcc explosion7
-		lda #0
-		sta spriteEna,x
-		beq explosion6
-explosion7	inc spriteShape,x
-explosion6	dex
-		bpl explosion4
-
-		inc turncnt		
-explosionEx	rts
+;explosion	lda dead
+;		bmi explosion1
+;
+;		ldx #1
+;		stx spriteModus+1
+;		dex
+;		stx mantajfy
+;		stx spriteEna+1
+;		stx turncnt
+;		dex
+;		stx dead
+;		
+;		ldx #7
+;explosion3	jsr random3bit
+;		adc mantaXPos
+;		sta spriteXpos,x
+;		jsr random4bit
+;		adc mantaYpos
+;		sta spriteYpos,x
+;		lda #explosion_major46
+;		sta spriteShape,x
+;		lda #0
+;		sta spriteEna,x
+;		dex
+;		bpl explosion3
+;		rts
+;
+;explosion1	dec mantajfy
+;		bpl explosionEx
+;		lda #1
+;		sta mantajfy
+;		
+;		ldx turncnt
+;		cpx #8
+;		bcs explosion9
+;		inc spriteEna,x
+;explosion9	cpx #19
+;		bcc explosion5
+;	
+;		pla
+;		pla
+;		jmp restart
+;		
+;		
+;explosion5	ldx #7
+;explosion4	lda spriteEna,x
+;		beq explosion6
+;		lda spriteShape,x
+;		cmp #explosion_major46+10
+;		bcc explosion7
+;		lda #0
+;		sta spriteEna,x
+;		beq explosion6
+;explosion7	inc spriteShape,x
+;explosion6	dex
+;		bpl explosion4
+;
+;		inc turncnt		
+;explosionEx	rts
 
 ;------------------------------------------------------------
 ; random4bit
@@ -1894,207 +3268,207 @@ random3bit	lda random
 ;------------------------------------------------------------
 ; collision
 ;------------------------------------------------------------
-collision	lda nocollision
-		bne collisionEx
-		
-		jsr getMantaScreen
-
-		ldx #3
-collision2	ldy #18
-collision1	lda (ptr),y
-		and #$F0
-		cmp #$80
-		bne collision4
-		inc dead
-collision4	iny
-		cpy #21
-		bne collision1
-
-		inc ptr+1
-		inc ptr+1
-collision3	dex
-		bne collision2
-
-		lda dead
-		beq collisionEx
-
-;		lda #$3f
-;		sta colbk
-		
-collisionEx	rts
-
-
-getMantaScreen
-		lda dreadXPos
-		sta ptr
-		sec
-		lda mantaYpos
-		sbc #20
-		lsr
-		lsr
-		and #$fe
-		clc
-		adc dreadXPos+1
-		sta ptr+1
-		rts
+;collision	lda nocollision
+;		bne collisionEx
+;		
+;		jsr getMantaScreen
+;
+;		ldx #3
+;collision2	ldy #18
+;collision1	lda (ptr),y
+;		and #$F0
+;		cmp #$80
+;		bne collision4
+;		inc dead
+;collision4	iny
+;		cpy #21
+;		bne collision1
+;
+;		inc ptr+1
+;		inc ptr+1
+;collision3	dex
+;		bne collision2
+;
+;		lda dead
+;		beq collisionEx
+;
+;;		lda #$3f
+;;		sta colbk
+;		
+;collisionEx	rts
+;
+;
+;getMantaScreen
+;		lda dreadXPos
+;		sta ptr
+;		sec
+;		lda mantaYpos
+;		sbc #20
+;		lsr
+;		lsr
+;		and #$fe
+;		clc
+;		adc dreadXPos+1
+;		sta ptr+1
+;		rts
 ;------------------------------------------------------------
 ; scrollSurface
 ;------------------------------------------------------------
-scrollSurface	lda hspeed
-		asl
-		sta temp
-		bmi incxpos					;scroll left
-		
-		clc
-		lda hscrol
-		adc temp
-		cmp #8
-		bcs decxpos2
-		sta hscrol
-		rts	
-		
-decxpos2	and #6
-		sta hscrol
-		lda turnactive
-		bne decxpos
-		
-		lda dreadXPos					;check if zero
-		cmp #<(dreadnaught+4)
-		lda dreadXpos+1
-		sbc #>(dreadnaught+4)
-		bcs decxpos
-
-		dec turnactive
-		lda #15
-		sta turncnt
-
-decxpos		lda dreadXPos
-		bne decxpos1
-		dec dreadXPos+1
-decxpos1	dec dreadXPos
-		jsr shaftRight
-		jmp incxpos2
-
+;scrollSurface	lda hspeed
+;		asl
+;		sta temp
+;		bmi incxpos					;scroll left
+;		
+;		clc
+;		lda hscrol
+;		adc temp
+;		cmp #8
+;		bcs decxpos2
+;		sta hscrol
+;		rts	
+;		
+;decxpos2	and #6
+;		sta hscrol
+;		lda turnactive
+;		bne decxpos
+;		
+;		lda dreadXPos					;check if zero
+;		cmp #<(dreadnaught+4)
+;		lda dreadXpos+1
+;		sbc #>(dreadnaught+4)
+;		bcs decxpos
 ;
+;		dec turnactive
+;		lda #15
+;		sta turncnt
 ;
+;decxpos		lda dreadXPos
+;		bne decxpos1
+;		dec dreadXPos+1
+;decxpos1	dec dreadXPos
+;		jsr shaftRight
+;		jmp incxpos2
 ;
-incxpos		clc
-		lda hscrol
-		adc temp
-		bmi incxpos3
-		sta hscrol
-		rts
-		
-incxpos3	and #6
-		sta hscrol
-		lda turnactive
-		bne incxpos1
-		
-		lda dreadXPos
-		cmp #<(dreadnaught+$1ac)
-		lda dreadXPos+1
-		sbc #>(dreadnaught+$1ac)
-		bcc incxpos1
-		
-		inc turnactive
-		lda #15
-		sta turncnt
-		
-incxpos1	inc dreadXPos
-		bne incxpos4
-		inc dreadXPos+1
-incxpos4	jsr shaftLeft
-
-incxpos2	lda dreadXPos+1					;compute playfield bounds for bullets
-		ror
-		lda dreadXpos
-		ror
-		sta leftbound
-		clc
-		adc #20
-		sta rightbound		
-		rts
+;;
+;;
+;;
+;incxpos		clc
+;		lda hscrol
+;		adc temp
+;		bmi incxpos3
+;		sta hscrol
+;		rts
+;		
+;incxpos3	and #6
+;		sta hscrol
+;		lda turnactive
+;		bne incxpos1
+;		
+;		lda dreadXPos
+;		cmp #<(dreadnaught+$1ac)
+;		lda dreadXPos+1
+;		sbc #>(dreadnaught+$1ac)
+;		bcc incxpos1
+;		
+;		inc turnactive
+;		lda #15
+;		sta turncnt
+;		
+;incxpos1	inc dreadXPos
+;		bne incxpos4
+;		inc dreadXPos+1
+;incxpos4	jsr shaftLeft
+;
+;incxpos2	lda dreadXPos+1					;compute playfield bounds for bullets
+;		ror
+;		lda dreadXpos
+;		ror
+;		sta leftbound
+;		clc
+;		adc #20
+;		sta rightbound		
+;		rts
 		
 
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-updateManta	lda turnactive
-		beq updateManta1
-
-		dec mantajfy
-		bmi updateManta2
-		rts
-		
-updateManta2	lda #1
-		sta mantajfy
-
-		ldx turncnt
-		lda turnactive
-		bpl flipMantaLeft
-
-flipMantaRight	jsr shapeRightSeq	
-		jmp flipManta
-
-flipMantaLeft	jsr shapeLeftSeq
-		
-flipManta	lda #1
-		cpx #7
-		bcs flipmanta3
-		dec xshadow
-		jmp flipmanta1
-flipmanta3	lda #0
-		cpx #9
-		bcc flipmanta1
-		lda #-1
-		inc xshadow
-		
-		clc
-flipmanta1	ldy turnactive
-		bpl flipmanta2
-		eor #$ff
-		adc #1
-flipmanta2	sta hspeed
-		dex
-		stx turncnt
-		bpl updateManta1		
-		stx mantajfy
-		inx
-		stx turnactive
-		asl hspeed
-		
-updateManta1	lda #mantax
-		sta spriteXpos
-		lda mantaYpos
-		sta spriteYpos
-
-		clc						;x-pos lo
-		lda #mantax
-		adc xshadow
-		sta spriteXpos+1
-		lda mantaYpos					;y-pos lo
-		adc xshadow
-		sta spriteYpos+1
-		rts
-		
-
-;------------------------------------------------------------
+;updateManta	lda turnactive
+;		beq updateManta1
 ;
-;------------------------------------------------------------
-shapeRightSeq	
-		lda flipRightSeq,x
-		sta spriteShape
-		sta spriteShape+1		
-		rts
-		
-;------------------------------------------------------------
+;		dec mantajfy
+;		bmi updateManta2
+;		rts
+;		
+;updateManta2	lda #1
+;		sta mantajfy
 ;
-;------------------------------------------------------------
-shapeLeftSeq	
-		lda flipLeftSeq,x
-		sta spriteShape
-		sta spriteShape+1		
-		rts
+;		ldx turncnt
+;		lda turnactive
+;		bpl flipMantaLeft
+;
+;flipMantaRight	jsr shapeRightSeq	
+;		jmp flipManta
+;
+;flipMantaLeft	jsr shapeLeftSeq
+;		
+;flipManta	lda #1
+;		cpx #7
+;		bcs flipmanta3
+;		dec xshadow
+;		jmp flipmanta1
+;flipmanta3	lda #0
+;		cpx #9
+;		bcc flipmanta1
+;		lda #-1
+;		inc xshadow
+;		
+;		clc
+;flipmanta1	ldy turnactive
+;		bpl flipmanta2
+;		eor #$ff
+;		adc #1
+;flipmanta2	sta hspeed
+;		dex
+;		stx turncnt
+;		bpl updateManta1		
+;		stx mantajfy
+;		inx
+;		stx turnactive
+;		asl hspeed
+;		
+;updateManta1	lda #mantax
+;		sta spriteXpos
+;		lda mantaYpos
+;		sta spriteYpos
+;
+;		clc						;x-pos lo
+;		lda #mantax
+;		adc xshadow
+;		sta spriteXpos+1
+;		lda mantaYpos					;y-pos lo
+;		adc xshadow
+;		sta spriteYpos+1
+;		rts
+;		
+;
+;;------------------------------------------------------------
+;;
+;;------------------------------------------------------------
+;shapeRightSeq	
+;		lda flipRightSeq,x
+;		sta spriteShape
+;		sta spriteShape+1		
+;		rts
+;		
+;;------------------------------------------------------------
+;;
+;;------------------------------------------------------------
+;shapeLeftSeq	
+;		lda flipLeftSeq,x
+;		sta spriteShape
+;		sta spriteShape+1		
+;		rts
 		
 ;------------------------------------------------------------
 ; renderSprites
@@ -2142,89 +3516,90 @@ renderSprites2	dex
 ;------------------------------------------------------------
 ; joystick input routine
 ;------------------------------------------------------------
-checkstick	lda trig0
-		eor #$01
-		sta firePressed
-		
-		lda porta
-		lsr
-		bcc stickup
-		lsr
-		bcc stickdown
-
-checkstickleft	lda turnactive					;if ship is turning
-		bne checkstickex				;no stick updates
-
-		dec stickjiffy
-		bpl checkstickex
-		lda #5
-		sta stickjiffy
-
-;		lda stick0
-		lda porta
-		lsr
-		lsr
-		lsr
-		bcc stickleft
-		lsr
-		bcc stickright
-checkstickex	rts
-		
-;------------------------------------------------------------
-stickleft	lda hspeed
-		bmi stickleft1
-		cmp #4
-		bcs stickleft2
-stickleft1	inc hspeed
-		bne stickleft2
-		inc turnactive
-stickleft3	lda #15
-		sta turncnt
-stickleft2	rts
-
-;------------------------------------------------------------
-stickright	lda hspeed
-		bpl stickright1
-		cmp #$fd
-		bcc stickleft2
-stickright1	dec hspeed
-		bne stickleft2
-		dec turnactive
-		bmi stickleft3
-
-;------------------------------------------------------------
-stickdown	lda mantaYpos
-		adc #3
-		cmp #137
-		bcc stickdown1
-		lda #137
-stickdown1	sta mantaYpos
-stickdown2	bne checkstickleft
-
-;------------------------------------------------------------
-stickup		lda mantaYpos
-		sbc #2						;=3 (carry clear)
-		cmp #21
-		bcs stickup1
-		lda #21
-stickup1	jmp stickdown1
-
+;checkstick	lda trig0
+;		eor #$01
+;		sta firePressed
+;		
+;		lda porta
+;		lsr
+;		bcc stickup
+;		lsr
+;		bcc stickdown
+;
+;checkstickleft	lda turnactive					;if ship is turning
+;		bne checkstickex				;no stick updates
+;
+;		dec stickjiffy
+;		bpl checkstickex
+;		lda #5
+;		sta stickjiffy
+;
+;;		lda stick0
+;		lda porta
+;		lsr
+;		lsr
+;		lsr
+;		bcc stickleft
+;		lsr
+;		bcc stickright
+;checkstickex	rts
+;		
+;;------------------------------------------------------------
+;stickleft	lda hspeed
+;		bmi stickleft1
+;		cmp #4
+;		bcs stickleft2
+;stickleft1	inc hspeed
+;		bne stickleft2
+;		inc turnactive
+;stickleft3	lda #15
+;		sta turncnt
+;stickleft2	rts
+;
+;;------------------------------------------------------------
+;stickright	lda hspeed
+;		bpl stickright1
+;		cmp #$fd
+;		bcc stickleft2
+;stickright1	dec hspeed
+;		bne stickleft2
+;		dec turnactive
+;		bmi stickleft3
+;
+;;------------------------------------------------------------
+;stickdown	lda mantaYpos
+;		adc #3
+;		cmp #137
+;		bcc stickdown1
+;		lda #137
+;stickdown1	sta mantaYpos
+;stickdown2	bne checkstickleft
+;
+;;------------------------------------------------------------
+;stickup		lda mantaYpos
+;		sbc #2						;=3 (carry clear)
+;		cmp #21
+;		bcs stickup1
+;		lda #21
+;stickup1	jmp stickdown1
+;
 ;------------------------------------------------------------
 ; initialize a level
 ;------------------------------------------------------------
 initLevel	ldx currentLevel	
 		lda levelColorBak,x
+		lda #0
 		sta colorbk
 		lda levelColorPf0,x
 		sta colorpf0
 		lda #$04
-		sta colorpf1
+		sta backgroundColor1
 		lda #$0f
-		sta colorpf2
+		sta backgroundColor2
 
-		jsr genStars	
-		jsr uploadSurfaceCharset
-		jsr drawdread
+;		jsr genStars	
+;		jsr uploadSurfaceCharset
+;		jsr drawdread
 
 		ldx #5*8-1					;initialize all sprite data
 		lda #0
@@ -2232,47 +3607,49 @@ initLevel1	sta spriteEna,x
 		dex
 		bpl initLevel1
 
-		stx hspeed					;X=$ff
+;		stx hspeed					;X=$ff
 		inx
-		stx hscrol					;X=$00
-		stx turnactive
-		stx dead
+;		stx hscrol					;X=$00
+;		stx turnactive
+;		stx dead
 		stx playerScore
 		stx playerScore+1
 		stx playerScore+2
 		stx playerScore+3	
 		stx minePos0
 		stx minePos1
+		stx indexToCurrentLevelTextureData
+		
 		inx
-		stx spriteEna					;X=$01
-		stx spriteEna+1
-		stx spriteShape
-		stx spriteShape+1
-		stx spriteModus
+;		stx spriteEna					;X=$01
+;		stx spriteEna+1
+;		stx spriteShape
+;		stx spriteShape+1
+;		stx spriteModus
 		stx currentPlayer
 		inx
-		stx spriteModus+1				;X=$02
+;		stx spriteModus+1				;X=$02
 		
-		lda #mantax
-		sta spriteXpos
-		sta mantaXpos
-		lda #mantax+8
-		sta spriteXpos+1
-		lda #mantay
-		sta spriteYpos
-		sta mantaYpos
-		lda #mantay+8
-		sta spriteYpos+1
-
-		lda #<(dreadnaught+0)
-		sta dreadXPos
-		lda #>(dreadnaught+0)
-		sta dreadXPos+1	
-
+;		lda #mantax
+;		sta spriteXpos
+;		sta mantaXpos
+;		lda #mantax+8
+;		sta spriteXpos+1
+;		lda #mantay
+;		sta spriteYpos
+;		sta mantaYpos
+;		lda #mantay+8
+;		sta spriteYpos+1
+;
+;		lda #<(dreadnaught+0)
+;		sta dreadXPos
+;		lda #>(dreadnaught+0)
+;		sta dreadXPos+1	
+;
 		lda #8
-		sta xshadow
+;		sta xshadow
 		sta currentPlayerLivesLeft
-		
+;		
 		lda #10
 		sta colorp2
 		sta colorp3
@@ -2306,14 +3683,14 @@ dli2		jmp dliproc0
 ; turn off yellow(gold) player coloring
 ; set dreadnaught colors
 ;
-dli1		lda colorpf1
+dli1		lda backgroundColor1
 		sta wsync
 		sta colpf1
 		lda colorbk
 		sta colbk
 		lda colorpf0
 		sta colpf0
-		lda colorpf2
+		lda backgroundColor2
 		sta colpf2
 		jmp dliproc0
 
@@ -2332,15 +3709,12 @@ dli0		lda #$02
 ; main game initialization
 ;------------------------------------------------------------
 initGame
-		jsr copyRomRam
-		jsr GenerateRandomDataFromRNG
-		jsr initdlist
-		jsr convert
-		jsr genTilePtrs
-		jsr setScreenLines
-		jsr uploadSprites
-		jsr uploadMainCharset
-		
+		jsr copyRomRam					;OS is not required, but the RAM underneath
+;		jsr GenerateRandomDataFromRNG
+		jsr initdlist					;initialise Atari Hardware
+;		jsr LoadSurfaceStructureData			;generate tile pointers
+		jsr setScreenLines				;upload addresses of gfx lines
+
 		ldx #0
 initPdata	lda #$ff
 		sta player0data,x
@@ -2351,14 +3725,13 @@ initPdata	lda #$ff
 		inx
 		bne initPdata
 
-filltitle:	lda #$30
+filltitle:	lda #$30					;clear title screen and debug lines
 		sta titlechars,x
 		lda #0
 		sta debugScreen,x
 		inx
 		cpx #160
 		bne filltitle
-		
 
 		rts
 		
@@ -2484,84 +3857,6 @@ copydlist	lda dl,x
 waitvcnt	cmp vcount
 		bne waitvcnt
 		rts
-;------------------------------------------------------------
-; convert 4kb charsets 
-; "00" -> "01"
-; "11" -> "00"
-;------------------------------------------------------------
-convert		ldx #16						;16 pages = 4kb
-		ldy #0
-		lda #<surfaceCharset
-		sta ptr
-		lda #>surfaceCharset
-		sta ptr+1
-		
-convert1	lda #$c0
-		sta mask
-		
-convert2	lda (ptr),y
-		and mask
-		bne convert3
-		lda (ptr),y					;"00" case -> "11"
-		ora mask
-		sta (ptr),y
-		jmp convert4
-convert3	cmp mask				
-		bne convert4
-		eor #$ff					;"11" case -> "00"
-		and (ptr),y
-		sta (ptr),y
-		
-convert4	lsr mask
-		lsr mask
-		bne convert2
-		
-		iny
-		bne convert1		
-		inc ptr+1
-		dex
-		bne convert1
-		rts
-
-;------------------------------------------------------------
-; generate tileDataPtrs
-;------------------------------------------------------------
-genTilePtrs	ldy #0
-		ldx #1
-		
-		lda #<tileData
-		sta tileDataPtr
-		lda #>tileData
-		sta tileDataPtr+1
-		bne genTilePtrs6
-
-genTilePtrs4	lda (tileDataPtr),y				;load tile's number of columns 
-		beq genTilePtrs3				;if zero exit
-		sta tileColumnCnt
-
-		inc tileDataPtr
-		bne genTilePtrs2
-		inc tileDataPtr+1
-
-genTilePtrs2	lda (tileDataPtr),y				;load number of rows
-		sec
-		adc tileDataPtr
-		sta tileDataPtr
-		bcc genTilePtrs1
-		inc tileDataPtr+1
-genTilePtrs1	dec tileColumnCnt
-		bne genTilePtrs2
-		
-genTilePtrs6	lda tileDataPtr
-		sta tileDataPtrLo,x
-		lda tileDataPtr+1
-		sta tileDataPtrHi,x
-
-		inx
-		jmp genTilePtrs4
-		
-genTilePtrs3	stx numberOfTiles		
-		rts
 
 ;------------------------------------------------------------
 ; set line addresses and blitwidth/heigt (40 / 136)
@@ -2605,78 +3900,6 @@ setScreenLines1	lda ptr
 setScreenLines2	dex
 		bne setScreenLines1
 		rts		
-		
-;------------------------------------------------------------
-;
-;------------------------------------------------------------
-uploadSprites	lda #<mantaShipSprites
-		sta ptr
-		lda #>mantaShipSprites
-		sta ptr+1
-		
-		ldx #0
-uploadSprites1	jsr uploadSprite
-		jsr addPtr64
-		inx
-		cpx #46
-		bne uploadSprites1
-		
-		lda #<explosion_major
-		sta ptr
-		lda #>explosion_major
-		sta ptr+1
-		
-uploadSprites2	jsr uploadSprite
-		jsr addPtr64
-		inx
-		cpx #58
-		bne uploadSprites2
-		
-		rts
-
-;------------------------------------------------------------
-;
-;------------------------------------------------------------
-uploadMainCharset		
-		lda #<titleCharset
-		ldx #>titleCharset
-		ldy #0					;charsetno 0
-		jsr uploadCharset
-		jmp uploadCharset1
-		
-uploadSurfaceCharset
-		lda #<surfaceCharset
-		ldx #>surfaceCharset
-		ldy #1					;charsetno 1
-		jsr uploadCharset
-		
-		ldx currentLevel
-		clc
-		lda charsetArray,x
-		adc ptr+1
-		sta ptr+1		
-		jmp uploadCharset1
-	
-;------------------------------------------------------------
-;
-;------------------------------------------------------------
-uploadCharset	sta ptr
-		stx ptr+1
-
-		lda #EGO_CMD_CHARSET		
-		sta EGO_REG_CMD				;upload charset
-		sty EGO_REG_DATA			;charset no 0 of 1
-
-uploadCharset1	ldx #4					;upload 1k;
-		ldy #0
-uploadCharset2	lda (ptr),y
-		sta EGO_REG_DATA
-		iny
-		bne uploadCharset2
-		inc ptr+1
-		dex
-		bne uploadCharset2
-		rts
 
 ;-------------------------------------------------------------------
 ; UpdateLivesLeft
@@ -2722,21 +3945,21 @@ b19E3   	stx livesLeftPlayerTwoText
 ; WriteToScreen
 ;-------------------------------------------------------------------
 WriteToScreen
-		stx ptr
-		sty ptr+1
+		stx dataLoPtr
+		sty dataHiPtr
 								;Get the Y Pos from the first byte
 		ldy #$00
-		lda (ptr),Y
+		lda (dataLoPtr),Y
 		sta currentCharYPos
 bB2A0   =*+$01
 		cmp #$18
 		bcs WriteToScreenEx				; Return early if the Y Pos is invalid				
 		iny						; Get the X pos from the second byte
-		lda (ptr),Y
+		lda (dataLoPtr),Y
 		sta currentCharXPos
 								
 		iny						; Get the character to write. Only use the lowest 7 bits for
-		lda (ptr),Y					; some reason.
+		lda (dataLoPtr),Y					; some reason.
 		and #$7F
 								; Skip to the entry point of the loop for reading in the
 								; characters to write.
@@ -2744,9 +3967,9 @@ bB2A0   =*+$01
 
 WriteCharsLoop
 		ldy temp
-		lda (ptr),Y
+		lda (dataLoPtr),Y
 WriteToScreen1	iny
-		sty temp					; Stop writing if the leftmost bit is set on aBA. This mean
+		sty temp					; Stop writing if the leftmost bit is set on temp. This mean
 								; the most bytes we'll write is 128.
 		bmi WriteToScreenEx				; Stop writing if the leftmost bit is set on the char to write.
 		cmp #$00
@@ -2764,24 +3987,24 @@ WriteCharacterToScreen
 		; Move the ptr to the x/y position.
 		ldy currentCharYPos
 		lda titleLineHi,Y
-		sta screenPtr+1
+		sta tempHiPtrCopyTo
 		lda titleLineLo,Y
 		clc
 		adc currentCharXPos
-		sta screenPtr
+		sta tempLoPtrCopyTo
 		lda #$00
-		adc screenPtr+1
-		sta screenPtr+1
+		adc tempHiPtrCopyTo
+		sta tempHiPtrCopyTo
 		
 		; Write the top half of the character
 		lda charToWrite
 		ldy #$00
-		sta (screenPtr),Y
+		sta (tempLoPtrCopyTo),Y
 		
 		; Write the bottom half of the character
 		ora #$80
 		ldy #$28
-		sta (screenPtr),Y
+		sta (tempLoPtrCopyTo),Y
 		
 		; Check if the byte encodes a second half.
 		inc currentCharXPos
@@ -2795,12 +4018,12 @@ WriteCharacterToScreen
 		; The byte encodes a second half. Write the top half of it.
 		ldy #$01
 		adc #$20
-		sta (screenPtr),Y
+		sta (tempLoPtrCopyTo),Y
 		
 		; Write the bottom half of it.
 		ora #$80
 		ldy #$29
-		sta (screenPtr),Y
+		sta (tempLoPtrCopyTo),Y
 		
 		inc currentCharXPos
 WriteCharacterToScreenEx		
@@ -2878,11 +4101,11 @@ char2gfx	lda #EGO_CMD_CHAR_TO_VIDEO
 		sta EGO_REG_CMD
 		
 		clc
-		;lda #<dreadnaught
-		lda dreadXPos
+		;lda dreadXPos
+		lda scrollPositionLoPtr
 		sta EGO_REG_DATA
-		;lda #>dreadnaught
-		lda dreadXPos+1
+		;lda dreadXPos+1
+		lda scrollPositionHiPtr
 		sta EGO_REG_DATA
 
 		ldx #0
@@ -2906,10 +4129,12 @@ char2gfx	lda #EGO_CMD_CHAR_TO_VIDEO
 		
 		lda #1
 		sta EGO_REG_DATA				;charset 0
-		lda hscrol
+		;lda hscrol
+		lda pixelsToScroll
+		and #$7e
 		sta EGO_REG_DATA				;scroll
 		lda #0
-		sta EGO_REG_DATA				;col38 = true
+		sta EGO_REG_DATA				;col38 = false
 		;rts
 		
 waitstatus	lda EGO_REG_STATUS
@@ -2919,211 +4144,211 @@ waitstatus	lda EGO_REG_STATUS
 ;------------------------------------------------------------
 ; draw dreadnaught
 ;------------------------------------------------------------
-drawdread	lda #40
-		sta dreadcolumn
-		lda #0
-		sta dreadcolumn+1
-
-		lda #<dreadnaught
-		sta screenPtr		
-		lda #>dreadnaught
-		sta screenPtr+1
-
-		lda #32
-		ldx #2*17
-		ldy #0
-drawdread1	sta (screenPtr),y
-		iny
-		bne drawdread1
-		inc screenPtr+1
-		dex
-		bne drawdread1
-		
-		ldx currentLevel
-		lda textureDataForLevelLoPtrArray,x
-		sta dreadPtr
-		lda textureDataForLevelHiPtrArray,x
-		sta dreadPtr+1
-		
-drawdread2	ldy #0
-		lda (dreadPtr),y				;load tile number
-		beq drawdetail
-		jsr incDreadPtr
-		
-		tax
-		lda tileDataPtrLo,x
-		sta tileDataPtr
-		lda tileDataPtrHi,x
-		sta tileDataPtr+1
-		jsr drawTile
-		beq drawdread2					;process next tile	
-		
-;------------------------------------------------------------
+;drawdread	lda #40
+;		sta dreadcolumn
+;		lda #0
+;		sta dreadcolumn+1
 ;
-;------------------------------------------------------------
-drawdetail	jsr incDreadPtr
-		lda (dreadPtr),y
-		beq drawdetail5
-		tax
-
-		jsr incDreadPtr
-		clc
-		lda (dreadPtr),y
-		adc #<(dreadnaught - $8418)
-		sta screenPtr
-		txa
-		adc #>(dreadnaught - $8218)
-		sta screenPtr+1
-		
-		jsr incDreadPtr
-		lda (dreadPtr),y				;load tile
-		tax
-		lda tileDataPtrLo,x
-		sta tileDataPtr
-		lda tileDataPtrHi,x
-		sta tileDataPtr+1
-		
-		lda (tileDataPtr),y				;get num of columns
-		sta tileColumnCnt
-		jsr incTileDataPtr
-
-drawdetail4	lda screenPtr+1
-		pha
-		lda screenPtr
-		pha
-
-		lda (tileDataPtr),y				;get num of rows
-		sta tileRowCnt
-		jsr incTileDataPtr
-
-drawdetail1	lda (tileDataPtr),y				;row data
-		cmp #32
-		beq drawdetail2
-		sta (screenPtr),y
-drawdetail2	jsr sub513
-		iny
-		cpy tileRowCnt
-		bne drawdetail1
-
-		tya
-		clc
-		adc tileDataPtr
-		sta tileDataPtr
-		bcc drawdetail3
-		inc tileDataPtr+1
-
-drawdetail3	clc
-		pla
-		adc #1
-		sta screenPtr
-		pla
-		adc #0
-		sta screenPtr+1
-
-		ldy #0	
-		dec tileColumnCnt
-		bne drawdetail4		
-		beq drawdetail		
-drawdetail5	rts
-		
-;------------------------------------------------------------
+;		lda #<dreadnaught
+;		sta screenPtr		
+;		lda #>dreadnaught
+;		sta screenPtr+1
 ;
-;------------------------------------------------------------
-incDreadPtr	inc dreadPtr
-		bne incDreadPtr1
-		inc dreadPtr+1
-incDreadPtr1	rts	
-
-;------------------------------------------------------------
+;		lda #32
+;		ldx #2*17
+;		ldy #0
+;drawdread1	sta (screenPtr),y
+;		iny
+;		bne drawdread1
+;		inc screenPtr+1
+;		dex
+;		bne drawdread1
+;		
+;		ldx currentLevel
+;		lda textureDataForLevelLoPtrArray,x
+;		sta dreadPtr
+;		lda textureDataForLevelHiPtrArray,x
+;		sta dreadPtr+1
+;		
+;drawdread2	ldy #0
+;		lda (dreadPtr),y				;load tile number
+;		beq drawdetail
+;		jsr incDreadPtr
+;		
+;		tax
+;		lda surfaceStructureDataLoPtrArray,x
+;		sta tileDataPtr
+;		lda surfaceStructureDataHiPtrArray,x
+;		sta tileDataPtr+1
+;		jsr drawTile
+;		beq drawdread2					;process next tile	
+;		
+;;------------------------------------------------------------
+;;
+;;------------------------------------------------------------
+;drawdetail	jsr incDreadPtr
+;		lda (dreadPtr),y
+;		beq drawdetail5
+;		tax
 ;
-;------------------------------------------------------------
-incTileDataPtr	inc tileDataPtr
-		bne incTileDataPtr1
-		inc tileDataPtr+1
-incTileDataPtr1	rts
-		
-;------------------------------------------------------------
+;		jsr incDreadPtr
+;		clc
+;		lda (dreadPtr),y
+;		adc #<(dreadnaught - $8418)
+;		sta screenPtr
+;		txa
+;		adc #>(dreadnaught - $8218)
+;		sta screenPtr+1
+;		
+;		jsr incDreadPtr
+;		lda (dreadPtr),y				;load tile
+;		tax
+;		lda surfaceStructureDataLoPtrArray,x
+;		sta tileDataPtr
+;		lda surfaceStructureDataHiPtrArray,x
+;		sta tileDataPtr+1
+;		
+;		lda (tileDataPtr),y				;get num of columns
+;		sta tileColumnCnt
+;		jsr incTileDataPtr
 ;
-;------------------------------------------------------------
-drawTile	lda (tileDataPtr),y				;get num of columns
-		sta tileColumnCnt
-		;jsr puthex
-		jsr incTileDataPtr
-
-		
-drawTile1	lda (tileDataPtr),y				;get num of rows
-		jsr drawcolumn
-		
-		inc dreadcolumn
-		bne drawTile2
-		inc dreadcolumn+1
-		
-drawTile2	;lda dreadcolumn
-		;cmp #<512
-		;lda dreadcolumn+1
-		;sbc #>512
-		;bcs drawTile3
-		
-		dec tileColumnCnt
-		bne drawTile1
-drawTile3	rts
-
-
-
-;------------------------------------------------------------
-; generate drawcolumn
-;------------------------------------------------------------
-drawcolumn	sta tileRowCnt					;row cnt
-		;jsr puthex
-		
-		inc tileDataPtr
-		bne drawcolumn1
-		inc tileDataPtr+1
-
-drawcolumn1	clc
-		lda firstline
-		adc dreadcolumn
-		sta screenPtr
-		lda firstline+1
-		adc dreadcolumn+1
-		sta screenPtr+1
-		
-drawcolumn2	lda (tileDataPtr),y				;row data
-		sta (screenPtr),y
-		jsr sub513
-		iny
-		cpy tileRowCnt
-		bne drawcolumn2
-
-		tya
-		clc
-		adc tileDataPtr
-		sta tileDataPtr
-		bcc drawcolumn3
-		inc tileDataPtr+1
-		
-drawcolumn3:	cpy #17
-		bcs drawcolumn4
-		lda #32
-		sta (screenPtr),y
-		jsr sub513	
-		iny
-		bne drawcolumn3
-		
-drawcolumn4	ldy #0
-		rts
-	
-;------------------------------------------------------------
+;drawdetail4	lda screenPtr+1
+;		pha
+;		lda screenPtr
+;		pha
 ;
-;------------------------------------------------------------
-sub513		sec
-		lda screenPtr
-		sbc #<513
-		sta screenPtr
-		lda screenPtr+1
-		sbc #>513
-		sta screenPtr+1
-		rts
+;		lda (tileDataPtr),y				;get num of rows
+;		sta tileRowCnt
+;		jsr incTileDataPtr
+;
+;drawdetail1	lda (tileDataPtr),y				;row data
+;		cmp #32
+;		beq drawdetail2
+;		sta (screenPtr),y
+;drawdetail2	jsr sub513
+;		iny
+;		cpy tileRowCnt
+;		bne drawdetail1
+;
+;		tya
+;		clc
+;		adc tileDataPtr
+;		sta tileDataPtr
+;		bcc drawdetail3
+;		inc tileDataPtr+1
+;
+;drawdetail3	clc
+;		pla
+;		adc #1
+;		sta screenPtr
+;		pla
+;		adc #0
+;		sta screenPtr+1
+;
+;		ldy #0	
+;		dec tileColumnCnt
+;		bne drawdetail4		
+;		beq drawdetail		
+;drawdetail5	rts
+;		
+;;------------------------------------------------------------
+;;
+;;------------------------------------------------------------
+;incDreadPtr	inc dreadPtr
+;		bne incDreadPtr1
+;		inc dreadPtr+1
+;incDreadPtr1	rts	
+;
+;;------------------------------------------------------------
+;;
+;;------------------------------------------------------------
+;incTileDataPtr	inc tileDataPtr
+;		bne incTileDataPtr1
+;		inc tileDataPtr+1
+;incTileDataPtr1	rts
+;		
+;;------------------------------------------------------------
+;;
+;;------------------------------------------------------------
+;drawTile	lda (tileDataPtr),y				;get num of columns
+;		sta tileColumnCnt
+;		;jsr puthex
+;		jsr incTileDataPtr
+;
+;		
+;drawTile1	lda (tileDataPtr),y				;get num of rows
+;		jsr drawcolumn
+;		
+;		inc dreadcolumn
+;		bne drawTile2
+;		inc dreadcolumn+1
+;		
+;drawTile2	;lda dreadcolumn
+;		;cmp #<512
+;		;lda dreadcolumn+1
+;		;sbc #>512
+;		;bcs drawTile3
+;		
+;		dec tileColumnCnt
+;		bne drawTile1
+;drawTile3	rts
+;
+;
+;
+;;------------------------------------------------------------
+;; generate drawcolumn
+;;------------------------------------------------------------
+;drawcolumn	sta tileRowCnt					;row cnt
+;		;jsr puthex
+;		
+;		inc tileDataPtr
+;		bne drawcolumn1
+;		inc tileDataPtr+1
+;
+;drawcolumn1	clc
+;		lda firstlineLo
+;		adc dreadcolumn
+;		sta screenPtr
+;		lda firstlineHi
+;		adc dreadcolumn+1
+;		sta screenPtr+1
+;		
+;drawcolumn2	lda (tileDataPtr),y				;row data
+;		sta (screenPtr),y
+;		jsr sub513
+;		iny
+;		cpy tileRowCnt
+;		bne drawcolumn2
+;
+;		tya
+;		clc
+;		adc tileDataPtr
+;		sta tileDataPtr
+;		bcc drawcolumn3
+;		inc tileDataPtr+1
+;		
+;drawcolumn3:	cpy #17
+;		bcs drawcolumn4
+;		lda #32
+;		sta (screenPtr),y
+;		jsr sub513	
+;		iny
+;		bne drawcolumn3
+;		
+;drawcolumn4	ldy #0
+;		rts
+;	
+;;------------------------------------------------------------
+;;
+;;------------------------------------------------------------
+;sub513		sec
+;		lda screenPtr
+;		sbc #<513
+;		sta screenPtr
+;		lda screenPtr+1
+;		sbc #>513
+;		sta screenPtr+1
+;		rts
 
 ;-------------------------------------------------------------------
 ; stars2gfx
@@ -3176,8 +4401,8 @@ genStars3	sta gfxtop,x
 		lda #4
 		sta cnt
 genStars4	ldy #$26
-genStars1	ldx rndidx
-		inc rndidx
+genStars1	ldx dataIndex
+		inc dataIndex
 		lda randomDataStorage,X
 		tax
 		lda #00
@@ -3208,8 +4433,8 @@ genStars2	sta (ptr),Y
 		bne genStars4
 		
 		ldy #16						;do 17 lines
-genstars8	ldx rndidx					;compute random line
-		inc rndidx
+genstars8	ldx dataIndex					;compute random line
+		inc dataIndex
 		lda randomDataStorage,X
 		and #$1f
 		cmp #17
@@ -3221,8 +4446,8 @@ genstars5	tax
 		lda lineAdrHi,x
 		sta starPosHi,y
 
-		ldx rndidx					;compute random xpos
-		inc rndidx
+		ldx dataIndex					;compute random xpos
+		inc dataIndex
 		lda randomDataStorage,X
 		and #$3f
 		cmp #38
@@ -3237,8 +4462,8 @@ genstars7	clc
 		adc #0
 		sta starPosHi,y
 		
-		ldx rndidx					;compute thickness
-		inc rndidx
+		ldx dataIndex					;compute thickness
+		inc dataIndex
 		lda randomDataStorage,X
 		and #1
 		sta starThick,y
@@ -3312,10 +4537,30 @@ time1		dex
 		dey
 		bne time1
 		rts
+		
 ;------------------------------------------------------------
 ;
 ;------------------------------------------------------------
-space		lda #0
+showcolors	ldx #0
+colors		lda vcount
+		cmp #2
+		bne colors
+
+colors1		stx wsync 
+		nop
+		stx colbk
+		stx colpf2
+		inx
+		bne colors1
+		
+		stx colbk
+		stx colpf2
+		beq colors
+		
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+prtspace	lda #0
 		beq print
 		
 ;------------------------------------------------------------
@@ -3392,7 +4637,6 @@ tileColumnCnt	.byte 0
 tileRowCnt	.byte 0
 numberOfTiles	.byte 0
 dreadcolumn	.word 0
-mask		.byte 0
 dlino		.byte 0
 hscrol		.byte 0
 currentLevel	.byte 1
@@ -3403,6 +4647,16 @@ pause		.byte 0
 xshadow		.byte 0
 dead		.byte 0
 nocollision	.byte 1
+hspeed		.byte 0
+p2Ypos		.byte 0
+colorp2		.byte 0
+colorp3		.byte 0
+colorpf0	.byte 0
+colorpf1	.byte 0
+colorpf2	.byte 0
+colorbk		.byte 0
+minePos0	.byte 0
+minePos1	.byte 0
 		
 flipLeftSeq	.byte 25,24,23,22,21,20,19,18,17		;left 1-9
 		.byte 38,37,36,35,34,33,32			;flip 0-6
@@ -3479,7 +4733,7 @@ starPosHi
 starThick
 :17		.byte 0
 
-firstline	.word dreadnaught+16*512
+;firstline	.word dreadnaught+16*512
 
 lineAdrLo	.byte <(gfxmem+4*40+00*320), <(gfxmem+4*40+01*320), <(gfxmem+4*40+02*320), <(gfxmem+4*40+03*320)
 		.byte <(gfxmem+4*40+04*320), <(gfxmem+4*40+05*320), <(gfxmem+4*40+06*320), <(gfxmem+4*40+07*320)
@@ -3490,28 +4744,34 @@ lineAdrHi	.byte >(gfxmem+4*40+00*320), >(gfxmem+4*40+01*320), >(gfxmem+4*40+02*3
 		.byte >(gfxmem+4*40+04*320), >(gfxmem+4*40+05*320), >(gfxmem+4*40+06*320), >(gfxmem+4*40+07*320)
 		.byte >(gfxmem+4*40+08*320), >(gfxmem+4*40+09*320), >(gfxmem+4*40+10*320), >(gfxmem+4*40+11*320)
 		.byte >(gfxmem+4*40+12*320), >(gfxmem+4*40+13*320), >(gfxmem+4*40+14*320), >(gfxmem+4*40+15*320)
-		.byte >(gfxmem+4*40+16*320)
+firstlineLo	.byte >(gfxmem+4*40+16*320)
 		
 titleLineLo	.byte <(titlechars+0*40),<(titlechars+1*40),<(titlechars+2*40),<(titlechars+3*40)
+		.byte <(dreadnaught+00*512),<(dreadnaught+01*512),<(dreadnaught+02*512),<(dreadnaught+03*512)
+		.byte <(dreadnaught+04*512),<(dreadnaught+05*512),<(dreadnaught+06*512),<(dreadnaught+07*512)
+		.byte <(dreadnaught+08*512),<(dreadnaught+09*512),<(dreadnaught+10*512),<(dreadnaught+11*512)
+		.byte <(dreadnaught+12*512),<(dreadnaught+13*512),<(dreadnaught+14*512),<(dreadnaught+15*512)
+firstlineHi	.byte <(dreadnaught+16*512)
+		
 titleLineHi	.byte >(titlechars+0*40),>(titlechars+1*40),>(titlechars+2*40),>(titlechars+3*40)
-
+		.byte >(dreadnaught+00*512),>(dreadnaught+01*512),>(dreadnaught+02*512),>(dreadnaught+03*512)
+		.byte >(dreadnaught+04*512),>(dreadnaught+05*512),>(dreadnaught+06*512),>(dreadnaught+07*512)
+		.byte >(dreadnaught+08*512),>(dreadnaught+09*512),>(dreadnaught+10*512),>(dreadnaught+11*512)
+		.byte >(dreadnaught+12*512),>(dreadnaught+13*512),>(dreadnaught+14*512),>(dreadnaught+15*512)
+		.byte >(dreadnaught+16*512)
 ;lineOffsetLo
 ;		.byte <(-04*40), <(-03*40), <(-02*40), <(-01*40), <(00*40), <(01*40), <(02*40), <(03*40)
 ;lineOffsetHi
 ;		.byte >(-04*40), >(-03*40), >(-02*40), >(-01*40), >(00*40), >(01*40), >(02*40), >(03*40)
-		
-tileDataPtrLo
-:160		.byte 0
-tileDataPtrHi
-:160		.byte 0
+	
 
 
-;		icl "EgoUridium-Manta.asm"	
-;		icl "explosion_sprites.asm"
-		
-titleCharset	ins "main-charset.bin"
-surfaceCharset	ins "surface-common-charset.bin"
-		icl "surface-charset.asm"
+;		;icl "EgoUridium-Manta.asm"	
+;		;icl "explosion_sprites.asm"
+		;
+titleCharset	;ins "main-charset.bin"
+surfaceCharset	;ins "surface-common-charset.bin"
+		;icl "surface-charset.asm"
 		
 		icl "EgoUridium-GameData.asm"
 		icl "EgoUridium-LevelData.asm"

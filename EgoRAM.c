@@ -566,7 +566,7 @@ void __not_in_flash_func(do_data)(uint8_t data)
         if (ego_cnt >= ego_line_no)
         {
             ego_state = EGO_ST_IDLE;
-            ego_log("cnt:%d %04X\n", ego_cnt, ego_line_ptr[ego_cnt - 1]);
+            // ego_log("cnt:%d %04X\n", ego_cnt, ego_line_ptr[ego_cnt - 1]);
         }
         else
             ego_state = EGO_ST_LINE_DATA_LO;
@@ -614,7 +614,7 @@ void __not_in_flash_func(do_data)(uint8_t data)
         if (ego_cnt >= 2048)
         {
             ego_state = EGO_ST_IDLE;
-            ego_log("charset %d loaded\n", ego_charset_no);
+            // ego_log("charset %d loaded\n", ego_charset_no);
         }
         break;
     case EGO_ST_CHR2GFX_SRC_LO:

@@ -18,6 +18,7 @@
 ;------------------------------------------------------------
 ptr		= $80
 cnt		= $82
+mask		= $83
 
 eol		= $9b
 
@@ -35,6 +36,7 @@ eol		= $9b
 		.proc main
 
 		jsr getOutch
+		jsr convert
 		jsr uploadAllSprites
 		jsr uploadCharsets
 		
@@ -43,6 +45,45 @@ eol		= $9b
 		jsr printstr
 		
 endless		jmp endless
+	
+;------------------------------------------------------------
+; convert 4kb charsets 
+; "00" -> "11"
+; "11" -> "00"
+;------------------------------------------------------------
+convert		ldx #16						;16 pages = 4kb
+		ldy #0
+		lda #<surfaceCharset
+		sta ptr
+		lda #>surfaceCharset
+		sta ptr+1
+		
+convert1	lda #$c0
+		sta mask
+		
+convert2	lda (ptr),y
+		and mask
+		bne convert3
+		lda (ptr),y					;"00" case -> "11"
+		ora mask
+		sta (ptr),y
+		jmp convert4
+convert3	cmp mask				
+		bne convert4
+		eor #$ff					;"11" case -> "00"
+		and (ptr),y
+		sta (ptr),y
+		
+convert4	lsr mask
+		lsr mask
+		bne convert2
+		
+		iny
+		bne convert1		
+		inc ptr+1
+		dex
+		bne convert1
+		rts
 		
 ;------------------------------------------------------------
 ;

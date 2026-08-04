@@ -1,3 +1,10 @@
+c64colors
+	;	BLACK,	WHITE,	RED,	CYAN,	PURPLE,	GREEN,	BLUE,	YELLOW	
+	.byte 	$00, 	$0f, 	$34, 	$c4, 	$54, 	$b4,	$74,	$ec
+	;	ORANGE,	BROWN,	LTRED,	GRAY1,	GRAY2,	LTGREEN,LTBLUE,	GRAY3  
+	.byte 	$18, 	$e2, 	$2a, 	$04, 	$06, 	$ba,	$7a,	$08
+
+
 screenWriteJumpTableLoPtr
         .BYTE <MaybeChangeTitleDecal,<UpdateAndDisplaySomeSprites,<UpdatePlayerScore,<MaybeShowPauseScreen
         .BYTE <ReturnEarly,<MaybeLaunchMine,<UpdateCurrentColorValue,<MaybeShowPauseScreen
@@ -48,6 +55,169 @@ enemyBulletSpriteTransformOffset
         .BYTE $05,$06,$06,$07,$00,$02,$05,$09
         .BYTE $09,$09,$02,$00,$14,$12,$0F,$0C
         .BYTE $0C,$0C,$12,$00
+
+scoringStrategyForLevelLoPtrArray ;= $C100
+        .BYTE <a0000,<level1EnemyFormationOrder,<level2EnemyFormationOrder,<level3EnemyFormationOrder
+        .BYTE <level4EnemyFormationOrder,<level5EnemyFormationOrder,<level6EnemyFormationOrder,<level7EnemyFormationOrder
+        .BYTE <level8EnemyFormationOrder,<level9EnemyFormationOrder,<level10EnemyFormationOrder,<level11EnemyFormationOrder
+        .BYTE <level12EnemyFormationOrder,<level13EnemyFormationOrder,<level14EnemyFormationOrder,<level15EnemyFormationOrder
+scoringStrategyForLevelHiPtrArray ;= $C110
+        .BYTE >a0000,>level1EnemyFormationOrder,>level2EnemyFormationOrder,>level3EnemyFormationOrder
+        .BYTE >level4EnemyFormationOrder,>level5EnemyFormationOrder,>level6EnemyFormationOrder,>level7EnemyFormationOrder
+        .BYTE >level8EnemyFormationOrder,>level9EnemyFormationOrder,>level10EnemyFormationOrder,>level11EnemyFormationOrder
+        .BYTE >level12EnemyFormationOrder,>level13EnemyFormationOrder,>level14EnemyFormationOrder,>level15EnemyFormationOrder
+	
+; Manta manoeuvres. These data structures are used to animate the movement
+; of the player's ship when it changes direction, rolls, or flips.
+
+a0000 = $0000
+mantaRollRightFrom90Degrees
+        .BYTE $04,MANTA_RIGHT_13,MANTA_RIGHT_14,MANTA_RIGHT_15,MANTA,$00,$FF
+mantaRollLeftFromUpsideDown
+        .BYTE $04,MANTA_RIGHT_5,MANTA_RIGHT_4,MANTA_RIGHT_3,MANTA_2,$00,$FF
+mantaRollLeft1
+        .BYTE $04,MANTA1,MANTA_2,MANTA_RIGHT_3,MANTA_RIGHT_4,$00,$FF
+mantaRollLeft
+        .BYTE $04,MANTA1,MANTA_2,MANTA_RIGHT_3,MANTA_RIGHT_4,$00,$FF
+
+mantaFlipFromRightToLeft
+        .BYTE $10,MANTA_LEFT_9,MANTA_LEFT_8,MANTA_LEFT_7,MANTA_LEFT_6,MANTA_LEFT_5,MANTA_LEFT_4
+        .BYTE MANTA_LEFT_3,MANTA_LEFT_2,MANTA_LEFT_1,MANTA_FLIP_6,MANTA_FLIP_5,MANTA_FLIP_4,MANTA_FLIP_3
+        .BYTE MANTA_FLIP_2,MANTA_FLIP_1,MANTA_FLIP_0,$28,$28
+mantaRollFacingRight
+        .BYTE $10,MANTA1,MANTA,MANTA_RIGHT_15,MANTA_RIGHT_14,MANTA_RIGHT_13,MANTA_RIGHT_12,MANTA_RIGHT_11
+        .BYTE MANTA_RIGHT_10,MANTA_RIGHT_9,MANTA_RIGHT_8,MANTA_RIGHT_7,MANTA_RIGHT_6,MANTA_RIGHT_5,MANTA_RIGHT_4,MANTA_RIGHT_3
+        .BYTE MANTA_2,$00,$FF
+
+mantaRollLeft90DegreesFacingLeft
+        .BYTE $04,MANTA_LEFT_5,MANTA_LEFT_6,MANTA_LEFT_7,MANTA_LEFT_8,$00,$01
+mantaRollRight90DegreesFacingLeft
+        .BYTE $04,MANTA_LEFT_13,MANTA_LEFT_12,MANTA_LEFT_11,MANTA_LEFT_10,$00,$01
+mantaRollRightFrom180DegreesFacingLeft
+        .BYTE $04,MANTA_LEFT_9,MANTA_LEFT_8,MANTA_LEFT_7,MANTA_LEFT_6,$00,$01
+mantaRollLeftFrom180DegreesFacingLeft
+        .BYTE $04,MANTA_LEFT_9,MANTA_LEFT_10,MANTA_LEFT_11,MANTA_LEFT_12,$00,$01
+mantaRollAndFlipLeft
+        .BYTE $10,MANTA1,MANTA,MANTA_RIGHT_15,MANTA_RIGHT_14
+        .BYTE MANTA_RIGHT_13,MANTA_RIGHT_12,MANTA_RIGHT_11
+        .BYTE MANTA_RIGHT_10,MANTA_RIGHT_9,MANTA_FLIP_7,MANTA_FLIP_8
+        .BYTE MANTA_FLIP_9,MANTA_FLIP_10,MANTA_FLIP_11,MANTA_FLIP_12
+        .BYTE MANTA_FLIP_13,$D8,$D8
+manta360RollLeft
+        .BYTE $10,MANTA_LEFT_9,MANTA_LEFT_8,MANTA_LEFT_7,MANTA_LEFT_6,MANTA_LEFT_5,MANTA_LEFT_4,MANTA_LEFT_3
+        .BYTE MANTA_LEFT_2,MANTA_LEFT_1,MANTA_LEFT_0,MANTA_LEFT_15,MANTA_LEFT_14,MANTA_LEFT_13,MANTA_LEFT_12,MANTA_LEFT_11
+        .BYTE MANTA_LEFT_10,$00,$01
+
+
+mantaleftFacingAnimationLoPtrArray
+        .BYTE <a0000,<a0000,<a0000,<a0000,<a0000,<mantaRollRightFrom180DegreesFacingLeft,<a0000,<a0000
+        .BYTE <a0000,<mantaRollAndFlipLeft,<a0000,<a0000,<mantaRollLeft90DegreesFacingLeft,<manta360RollLeft,<mantaRollRight90DegreesFacingLeft,<a0000
+        .BYTE <a0000,<a0000,<a0000,<a0000,<a0000,<mantaRollLeftFrom180DegreesFacingLeft
+mantaleftFacingAnimationHiPtrArray
+        .BYTE >a0000,>a0000,>a0000,>a0000,>a0000,>mantaRollRightFrom180DegreesFacingLeft,>a0000,>a0000
+        .BYTE >a0000,>mantaRollAndFlipLeft,>a0000,>a0000,>mantaRollLeft90DegreesFacingLeft,>manta360RollLeft,>mantaRollRight90DegreesFacingLeft,>a0000
+        .BYTE >a0000,>a0000,>a0000,>a0000,>a0000,>mantaRollLeftFrom180DegreesFacingLeft
+
+mantaRightFacingAnimationLoPtrArray
+        .BYTE <a0000,<mantaRollLeft1,<a0000,<a0000,<a0000,<a0000,<a0000,<a0000
+        .BYTE <mantaRollRightFrom90Degrees,<mantaRollFacingRight,<mantaRollLeftFromUpsideDown,<a0000,<a0000,<mantaFlipFromRightToLeft,<a0000,<a0000
+        .BYTE <a0000,<mantaRollLeft
+mantaRightFacingAnimationHiPtrArray
+        .BYTE >a0000,>mantaRollLeft1,>a0000,>a0000,>a0000,>a0000,>a0000,>a0000
+        .BYTE >mantaRollRightFrom90Degrees,>mantaRollFacingRight,>mantaRollLeftFromUpsideDown,>a0000,>a0000,>mantaFlipFromRightToLeft,>a0000,>a0000
+        .BYTE >a0000,>mantaRollLeft
+
+; The values in these arrays get loaded by UpdateSpriteVariablesAndThenRedrawSprites to:
+; spriteIndex, currentSpriteXPos, currentSpriteMSBXPosOffset, currentSpriteYPos,
+; currentSpriteDisplayEnable, currentSpriteExpandVertical,
+; currentSpriteBackgroundDisplayPriority, currentSpriteMultiColorMode,
+; currentSpriteExpandHorizontal, currentSpriteColor, currentSpriteValue.
+mantaAnimationVariables
+        .BYTE $06,$70,$00,$98,$FF,$00,$00,$FF
+        .BYTE $00,$F0,$59
+spriteVariablesDemo
+        .BYTE $06,$AA,$00,$98,$FF,$00,$00,$FF
+        .BYTE $00,$F0,$59
+spriteVariablesManta
+;        .BYTE $06,$A0,$00,$AE,$FF,$00,$00,$FF
+        .BYTE $06,$A0,$00,100,$FF,$00,$00,$FF
+        .BYTE $00,$F0,$41
+dropshipSpriteVariables10
+        .BYTE $07,$BA,$00,$A8,$FF,$00,$FF,$00
+        .BYTE $00,$FB,$89
+spriteVariablesExplosion
+        .BYTE $07,$AA,$00,$00,$FF,$00,$00,$FF
+        .BYTE $00,$F7,$30
+someKindOfSettingArray
+        .BYTE $FD,$03,$F8,$08,$B0,$40,$50,$C0
+mantaShadowOffsets   
+        .BYTE $00,$00,$FF,$FE,$FD,$FD,$FE,$FE
+        .BYTE $FF,$00,$01,$02,$03,$03,$02,$02
+        .BYTE $01
+loPtrsToShipDeploymentSpriteVariables
+        .BYTE <dropshipSpriteVariables1,<dropshipSpriteVariables2,<dropshipSpriteVariables3,<dropshipSpriteVariables4
+        .BYTE <dropshipSpriteVariables5,<dropshipSpriteVariables6,<bayDoorSection,<dropshipSpriteVariables8
+loPtrToMantaAnimationVariables
+        .BYTE <mantaAnimationVariables,<dropshipSpriteVariables10
+hiPtrsToShipDeploymentSpriteVariables
+        .BYTE >dropshipSpriteVariables1,>dropshipSpriteVariables2,>dropshipSpriteVariables3,>dropshipSpriteVariables4
+        .BYTE >dropshipSpriteVariables5,>dropshipSpriteVariables6,>bayDoorSection,>dropshipSpriteVariables8
+hiPtrToMantaAnimationVariables
+        .BYTE >mantaAnimationVariables,>dropshipSpriteVariables10
+
+; The values in these arrays get loaded by UpdateSpriteVariablesAndThenRedrawSprites to:
+; spriteIndex, currentSpriteXPos, currentSpriteMSBXPosOffset, currentSpriteYPos,
+; currentSpriteDisplayEnable, currentSpriteExpandVertical,
+; currentSpriteBackgroundDisplayPriority, currentSpriteMultiColorMode,
+; currentSpriteExpandHorizontal, currentSpriteColor, currentSpriteValue.
+dropshipSpriteVariables1
+        .BYTE $00,$82,$00,$8D,$FF,$00,$00,$FF
+        .BYTE $00,$FC,$00
+dropshipSpriteVariables2
+        .BYTE $01,$6A,$00,$8D,$FF,$00,$00,$FF
+        .BYTE $00,$FC,$01
+dropshipSpriteVariables3
+        .BYTE $02,$52,$00,$8D,$FF,$00,$00,$FF
+        .BYTE $00,$FC,$02
+dropshipSpriteVariables4
+        .BYTE $03,$82,$00,$A2,$FF,$00,$00,$FF
+        .BYTE $00,$FC,$03
+dropshipSpriteVariables5
+        .BYTE $04,$6A,$00,$A2,$FF,$00,$00,$FF
+        .BYTE $00,$FC,$04
+dropshipSpriteVariables6
+        .BYTE $05,$52,$00,$A2,$FF,$00,$00,$FF
+        .BYTE $00,$FC,$05
+bayDoorSection
+        .BYTE $06,$82,$00,$8E,$FF,$FF,$00,$00
+        .BYTE $00,$FB,$07
+dropshipSpriteVariables8
+        .BYTE $07,$82,$00,$8E,$FF,$FF,$00,$FF
+        .BYTE $00,$FE,$06
+
+newLevelColors
+        .BYTE M_GRAY3,M_WHITE,M_BLACK,M_WHITE,M_GRAY3,M_BLACK,M_GRAY3,M_GRAY2
+        .BYTE M_BLACK,M_BLACK,M_BLACK,M_BLACK,M_BLACK,M_BLACK
+
+        ; Background Color 1, Background Color 1, Character Color, Sprite MultiColor0, Sprite Color
+levelColorScheme
+        .BYTE M_GRAY1,M_GRAY3,M_ORANGE,M_GRAY2,M_GRAY1
+        .BYTE M_BLACK,M_GRAY1,M_LTBLUE,M_LTRED,M_RED      ; Level 2, Level 13
+        .BYTE M_BLACK,M_GRAY2,M_LTRED,M_LTBLUE,M_BLUE     ; Level 8
+        .BYTE M_GREEN,M_LTGREEN,M_ORANGE,M_LTBLUE,M_BLUE  ; Level 5
+        .BYTE M_RED,M_LTRED,M_ORANGE,M_YELLOW,M_ORANGE    ; Level 15
+        .BYTE M_GRAY1,M_GRAY2,M_GRAY2,M_LTRED,M_RED       ; Level 10
+        .BYTE M_BLUE,M_LTBLUE,M_ORANGE,M_LTGREEN,M_GREEN  ; Level 9 , Level 14
+        .BYTE M_ORANGE,M_YELLOW,M_ORANGE,M_GRAY2,M_BLACK  ; Level 6
+        .BYTE M_GRAY1,M_CYAN,M_LTGREEN,M_LTRED,M_RED      ; Level 7
+        .BYTE M_BROWN,M_ORANGE,M_ORANGE,M_LTGREEN,M_GREEN ; Level 3, Level 11
+        .BYTE M_GRAY1,M_GRAY3,M_ORANGE,M_YELLOW,M_ORANGE  ; Level 1
+        .BYTE M_BLUE,M_CYAN,M_ORANGE,M_GRAY2,M_GRAY1      ; Level 12
+        .BYTE M_GRAY1,M_GRAY3,M_ORANGE,M_LTBLUE,M_BLUE    ; Level 4
+        
+        .BYTE $04,$02,$03,$06,$07,$08
+        .BYTE $08,$06,$05,$02,$03,$06,$08,$0B
+        .BYTE $07,$06,$05,$02,$03
 	
 f33C6   .BYTE $06,$08,$0B,$07,$06,$04,$02,$03
         .BYTE $06,$07,$08,$08,$06,$00,$00,$00
@@ -87,6 +257,61 @@ pauseText
 ;        .BYTE "  Pause   ", $FF
 	.byte $30,$30,$49,$0a,$1e,$1c,$0e,$30,$30,$30,$ff
 	
+player1
+        .BYTE $0A,$0F
+        .byte "Player 1", $FF
+player2
+        .BYTE $0A,$0F
+        .byte "Player 2", $FF
+gameOn
+        .BYTE $0D,$0E
+        .byte 'Game On!', $FF
+
+tensLivesLeftDisplayed = *+$02
+livesLeftDisplayed = *+$03
+livesLeftText
+        .BYTE $10,$0E
+        .byte " 3     left.", $FF
+gameOver
+        .BYTE $0D,$0D
+        .byte "Game Over!", $FF
+
+destructSequencePrimed
+        .BYTE $07,$07
+        .byte "Destruct sequence primed!", $FF
+formationAnnihilationBonusText
+        .BYTE $0A,$05
+        .byte "Formation annihilation bonus:", $FF
+shipDestructBonusText
+        .BYTE $10,$0A
+        .byte "Ship destruct bonus:"
+        .byte $FF
+
+scoreBonusMultiplierValue = *+$08
+scoreBonusResult = *+$0D
+scoreBonusText
+        .BYTE $0D,$0D
+        .byte "100 X 00 = 0000", $FF
+youveAmassedAHighScore
+        .BYTE $0D,$04
+        .byte "You have amassed a great score!", $FF
+pleaseEnterYourInitials
+        .BYTE $10,$06
+        .byte "Please enter your initials.", $FF
+
+initialOne = *+$02
+initial2 = *+$03
+initial3 = *+$04
+initialsInputField
+        .BYTE $13,$11
+        .byte "A..   ", $FF
+alphabetText
+        .byte "ABCDEFGHIJKLMNOPQRSTUVWXYZ "
+miniGameColorSequence3   .BYTE M_WHITE,M_GRAY3,M_GRAY2,M_GRAY1,M_BLACK
+miniGameColorSequence1   .BYTE M_GRAY3,M_GRAY2,M_GRAY1,M_BLACK,M_BLACK
+miniGameColorSequence2   .BYTE M_GRAY1,M_GRAY1,M_BLACK,M_BLACK,M_BLACK
+
+
 arrowKeysSymbol
         .BYTE $02,$0A,$57,$FF
 globeSymbol
@@ -119,7 +344,73 @@ inGameBanner ; $3526
         .byte "        ", $56, $FF, "2c     ", $55, $55, " "
         .byte "      ", $56, $FF
 
-tileData
+initialPositionOfMiniGameScreenData
+        .BYTE $FF,$C3,$99,$99,$99,$99,$C3,$FF
+        .BYTE $FF,$E3,$C3,$F3,$F3,$F3,$C1,$FF
+        .BYTE $FF,$C1,$9C,$F9,$C3,$9F,$80,$FF
+        .BYTE $FF,$C1,$9C,$F1,$F1,$9C,$C1,$FF
+        .BYTE $FF,$E1,$C9,$99,$99,$80,$F9,$FF
+        .BYTE $FF,$80,$9F,$81,$FC,$9C,$C1,$FF
+        .BYTE $FF,$E0,$CF,$81,$9C,$9C,$C1,$FF
+        .BYTE $FF,$80,$FC,$F9,$F3,$F3,$F3,$FF
+        .BYTE $FF,$C1,$9C,$C1,$C1,$9C,$C1,$FF
+        .BYTE $FF,$C1,$9C,$9C,$C0,$F9,$83,$FF
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $55,$55,$50,$45,$46,$46,$46,$46
+        .BYTE $55,$55,$05,$99,$49,$49,$49,$49
+        .BYTE $55,$55,$54,$50,$58,$54,$54,$54
+        .BYTE $55,$55,$25,$65,$65,$65,$65,$65
+        .BYTE $55,$55,$50,$4A,$49,$55,$55,$54
+        .BYTE $55,$55,$05,$99,$49,$49,$19,$65
+        .BYTE $55,$55,$50,$4A,$65,$54,$56,$55
+        .BYTE $55,$55,$05,$59,$19,$65,$45,$19
+        .BYTE $55,$55,$40,$46,$46,$46,$46,$45
+        .BYTE $55,$55,$55,$55,$55,$55,$55,$01
+        .BYTE $55,$55,$40,$4A,$49,$44,$6A,$55
+        .BYTE $55,$55,$01,$A9,$55,$15,$45,$19
+        .BYTE $55,$55,$50,$4A,$49,$44,$45,$46
+        .BYTE $55,$55,$01,$A9,$55,$05,$99,$49
+        .BYTE $55,$55,$40,$6A,$55,$55,$54,$51
+        .BYTE $55,$55,$01,$99,$49,$19,$65,$95
+        .BYTE $55,$55,$50,$46,$49,$54,$51,$46
+        .BYTE $55,$55,$05,$99,$49,$25,$95,$49
+        .BYTE $55,$55,$50,$4A,$49,$44,$5A,$55
+        .BYTE $55,$55,$05,$59,$19,$19,$59,$19
+        .BYTE $FF,$C1,$9C,$9C,$90,$99,$C0,$FF
+        .BYTE $FF,$9C,$9C,$9C,$9C,$9C,$C1,$FF
+        .BYTE $FF,$E1,$F3,$F3,$F3,$F3,$E1,$FF
+        .BYTE $FF,$81,$E7,$E7,$E7,$E7,$E7,$FF
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $46,$45,$45,$45,$45,$5A,$55,$55
+        .BYTE $49,$19,$59,$59,$59,$A5,$55,$55
+        .BYTE $54,$50,$55,$55,$55,$5A,$55,$55
+        .BYTE $65,$51,$59,$59,$59,$A9,$55,$55
+        .BYTE $51,$45,$45,$45,$45,$6A,$55,$55
+        .BYTE $95,$01,$59,$59,$59,$A9,$55,$55
+        .BYTE $45,$40,$45,$45,$65,$5A,$55,$55
+        .BYTE $19,$59,$59,$59,$65,$95,$55,$55
+        .BYTE $45,$45,$45,$6A,$55,$55,$55,$55
+        .BYTE $59,$59,$59,$99,$49,$69,$55,$55
+        .BYTE $45,$40,$45,$45,$65,$5A,$55,$55
+        .BYTE $19,$59,$59,$59,$65,$95,$55,$55
+        .BYTE $46,$45,$45,$45,$65,$5A,$55,$55
+        .BYTE $49,$19,$59,$59,$59,$A5,$55,$55
+        .BYTE $51,$51,$51,$51,$51,$5A,$55,$55
+        .BYTE $95,$95,$95,$95,$95,$95,$55,$55
+        .BYTE $46,$45,$45,$45,$45,$5A,$55,$55
+        .BYTE $49,$19,$59,$59,$59,$A5,$55,$55
+        .BYTE $55,$40,$45,$45,$45,$6A,$55,$55
+        .BYTE $19,$19,$59,$59,$59,$A5,$55,$55
+
+surfaceStructureData
         .BYTE $01,$01,$20
 
 	.BYTE $01,$11,$21,$22,$22
