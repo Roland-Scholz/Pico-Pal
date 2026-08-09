@@ -3,9 +3,9 @@ surfaceCharset1 = $0100
 surfaceCharset2 = $0200
 surfaceCharset3 = $0300
 
-charsetArray
-	.byte $08,$00,$08,$00,$00,$08,$04,$00
-        .BYTE $04,$08,$00,$08,$04,$00,$08
+;charsetArray
+;	.byte $00,$08,$00,$08,$00,$00,$08,$04
+;       .byte $00,$04,$08,$00,$08,$04,$00,$08
 
 levelColorBak
 	.byte $00,$74,$00,$00,$00,$00,$c8,$36

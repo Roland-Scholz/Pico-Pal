@@ -140,7 +140,7 @@ spriteVariablesDemo
         .BYTE $00,$F0,$59
 spriteVariablesManta
 ;        .BYTE $06,$A0,$00,$AE,$FF,$00,$00,$FF
-        .BYTE $06,$A0,$00,100,$FF,$00,$00,$FF
+        .BYTE $06,$A0+8,$00,100,$FF,$00,$00,$FF
         .BYTE $00,$F0,$41
 dropshipSpriteVariables10
         .BYTE $07,$BA,$00,$A8,$FF,$00,$FF,$00

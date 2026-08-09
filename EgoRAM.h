@@ -33,9 +33,10 @@
 #define EGO_CMD_SPRITE_MODE 17
 #define EGO_CMD_CHARSET 18
 #define EGO_CMD_CHAR_TO_VIDEO 19
-#define EGO_CMD_CHAR 20
+#define EGO_CMD_SET_CHAR 20
+#define EGO_CMD_GET_CHAR 21
 
-#define EGO_CMD_MOVEMENT 99
+#define EGO_CMD_DEBUG 99
 
 #define EGO_ST_IDLE 0
 #define EGO_ST_SHAPE_NO 1
@@ -79,6 +80,7 @@
 #define EGO_ST_CHR2GFX_COL38 39
 #define EGO_ST_CHAR_NO 40
 #define EGO_ST_CHAR_DATA 41
+#define EGO_ST_CHAR_GET_DATA 42
 
 #define EGO_MODE_XOR 0
 #define EGO_MODE_MASK 1

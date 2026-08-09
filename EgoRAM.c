@@ -450,6 +450,22 @@ void __not_in_flash_func(char_to_video)()
     }
 }
 
+void print_debug()
+{
+    sprite_t *sp;
+    int i;
+
+    for (i = EGO_MAX_SPRITES - 1; i >= 0; i--)
+    {
+        sp = &sprite_array[i];
+
+        if (sp->enabled)
+        {
+            ego_log("sprite:%d, mode:%d, shape:%d, xpos:%d, ypos:%d\n", i, sp->mode, sp->shape_no, sp->xpos, sp->ypos);
+        }
+    }
+}
+
 void __not_in_flash_func(do_data)(uint8_t data)
 {
     int i;
@@ -658,8 +674,8 @@ void __not_in_flash_func(do_data)(uint8_t data)
         ego_state = EGO_ST_CHR2GFX_CHARSET_NO;
         break;
     case EGO_ST_CHR2GFX_CHARSET_NO:
-        ego_charset_no = data & 0x01;
-        if (ego_cmd == EGO_CMD_CHAR)
+        ego_charset_no = data;
+        if (ego_cmd == EGO_CMD_SET_CHAR || ego_cmd == EGO_CMD_GET_CHAR)
             ego_state = EGO_ST_CHAR_NO;
         else
             ego_state = EGO_ST_CHR2GFX_SCROLL;
@@ -675,8 +691,17 @@ void __not_in_flash_func(do_data)(uint8_t data)
         break;
     case EGO_ST_CHAR_NO:
         ego_char_no = data;
-        ego_state = EGO_ST_CHAR_DATA;
-        ego_cnt = 0;
+        if (ego_cmd == EGO_CMD_GET_CHAR)
+        {
+            ego_state = EGO_ST_CHAR_GET_DATA;
+            cart_d5xx[EGO_REG_DATA] = charset_array[ego_charset_no][(ego_char_no << 3)];
+            ego_cnt = 1;
+        }
+        else
+        {
+            ego_cnt = 0;
+            ego_state = EGO_ST_CHAR_DATA;
+        }
         break;
     case EGO_ST_CHAR_DATA:
         charset_array[ego_charset_no][(ego_char_no << 3) + ego_cnt] = data;
@@ -755,11 +780,14 @@ void __not_in_flash_func(do_command)(uint8_t data)
     case EGO_CMD_CHAR_TO_VIDEO:
         ego_state = EGO_ST_CHR2GFX_SRC_LO;
         break;
-    case EGO_CMD_CHAR:
+    case EGO_CMD_SET_CHAR:
         ego_state = EGO_ST_CHR2GFX_CHARSET_NO;
         break;
-    case EGO_CMD_MOVEMENT:
-        do_movement();
+    case EGO_CMD_GET_CHAR:
+        ego_state = EGO_ST_CHR2GFX_CHARSET_NO;
+        break;
+    case EGO_CMD_DEBUG:
+        print_debug();
         break;
     default:
         break;
@@ -769,8 +797,8 @@ void __not_in_flash_func(do_command)(uint8_t data)
 void __not_in_flash_func(core1_main)()
 {
     uint32_t msg;
-    uint32_t data;
-    uint32_t addr;
+    uint8_t data;
+    uint16_t addr;
 
     systick_init();
 
@@ -825,12 +853,24 @@ void __not_in_flash_func(putChar)(int xpos, int ypos, uint8_t c)
 
 uint8_t read_d5xx(uint8_t addr)
 {
+
+    switch (ego_state)
+    {
+    case EGO_ST_CHAR_GET_DATA:
+        cart_d5xx[addr] = charset_array[ego_charset_no][(ego_char_no << 3) + ego_cnt];
+        ego_cnt++;
+        if (ego_cnt > 7)
+            ego_state = EGO_ST_IDLE;
+        break;
+    default:
+        break;
+    }
+
     return cart_d5xx[addr];
 }
 
 void __not_in_flash_func(write_d5xx)(uint8_t addr, uint8_t data)
 {
-
     cart_d5xx[EGO_REG_STATUS] |= 0x80;
 
     if (multicore_fifo_wready)

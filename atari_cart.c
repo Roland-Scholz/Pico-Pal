@@ -104,7 +104,7 @@ void __not_in_flash_func(emulate_roland)()
 		{
 			if (!(pins & RW_GPIO_MASK))
 			{
-				// ATARI writes to datat bus
+				// ATARI writes to data bus
 				// read data bus on falling edge of phi2
 				while ((pins = gpio_get_all()) & PHI2_GPIO_MASK)
 					;
@@ -127,12 +127,15 @@ void __not_in_flash_func(emulate_roland)()
 				{
 					addr &= 0xff;
 				}
+
 				gpio_put_masked(DATA_GPIO_MASK, ((uint32_t)ram_ptr[addr]) << 13);
 
 				//  wait for phi2 low
 				while (gpio_get_all() & PHI2_GPIO_MASK)
 					;
 				SET_DATA_MODE_IN;
+				if (addr == EGO_REG_DATA)
+					ram_ptr[addr] = read_d5xx(addr);
 			}
 		}
 	}
