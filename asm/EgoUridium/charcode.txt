@@ -1,0 +1,89 @@
+$0a	10		a
+$0b	11		b
+$0c	12		c
+$0d	13		d
+$0e	14		e
+$0f	15		f
+$10	16		g
+$11	17		h
+$12	18		i
+$13	19		j
+$14	20		k
+$15	21		l
+$16	22		m
+$17	23		n
+$18	24		o
+$19	25		p
+$1a	26		q
+$1b	27		r
+$1c	28		s
+$1d	29		t
+$1e	30		u
+$1f 31		v
+$20	32		w
+$21	33		x
+$22	34		y
+$23	35		z
+
+$30			space
+
+$3a			Aa
+$3b			Ba
+$3c			Ca
+$3d			Da
+$3e			Ea
+$3f			Fa
+$40			Ga
+$41			Ha
+$42			Ia
+$43			Ja
+$44			Ka
+$45			La
+$46			Ma
+$47			Na
+$48			Oa
+$49			Pa
+$4a			Qa
+$4b			Ra
+$4c			Sa
+$4d			Ta
+$4e			Ua
+$4f			Va
+$50			Wa
+$51			Xa
+$52			Ya
+$53			Za
+$54			wa
+			
+$59			(c
+
+$5a			Ab
+$5b			Bb
+$5c			Cb
+$5d			Db
+$5e			Eb
+$5f			Fb
+$60			Gb
+$61			Hb
+$62			Ib
+$63			Jb
+$64			Kb
+$65			Lb
+$66			Mb
+$67			Nb
+$68			Ob
+$69			Pb
+$6a			Qb
+$6b			Rb
+$6c			Sb
+$6d			Tb
+$6e			Ub
+$6f			Vb
+$70			Wb
+$71			Xb
+$72			Yb
+$73			Zb
+$74			wb
+
+$79			c)
+
