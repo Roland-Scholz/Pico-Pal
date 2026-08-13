@@ -177,6 +177,7 @@ void __not_in_flash_func(sprite_draw)(sprite_t *sp)
     int xvstart, vstart;
     int xlen, ylen;
     int i, x, y;
+
     uint8_t mask;
     uint8_t shadow;
     uint16_t vpos;

@@ -35,12 +35,6 @@ bulletSpriteArray
         .BYTE BULLET_NARROW,BULLET_5,BULLET_NARROW,BULLET_WIDE,BULLET_5,BULLET_NARROW,BULLET_VERYNARROW,BULLET_NARROW
         .BYTE EXPLOSION_1,BULLET_SINGLE,BULLET_WIDE,BULLET_WIDE,BULLET_VERYNARROW,BULLET_NARROW,BULLET_NARROW,BULLET_WIDE
 
-scoresForHittingStructuresArray
-        .byte $00,$0C,$0D,$10,$11,$0F,$0D,$0C
-        .byte $00,$0B,$0D,$00,$00,$00,$00,$00
-        .byte $00,$00,$00,$00,$00,$00,$00,$00
-        .byte $00
-
 indexToScoresToAddArray
         .BYTE $06,$05,$06,$07,$07,$05,$09,$08
         .BYTE $04,$04,$08,$06,$04,$06,$05,$07
@@ -140,7 +134,7 @@ spriteVariablesDemo
         .BYTE $00,$F0,$59
 spriteVariablesManta
 ;        .BYTE $06,$A0,$00,$AE,$FF,$00,$00,$FF
-        .BYTE $06,$A0+8,$00,100,$FF,$00,$00,$FF
+        .BYTE $06,$A0+8,$00,97 ,$FF,$00,$00,$FF
         .BYTE $00,$F0,$41
 dropshipSpriteVariables10
         .BYTE $07,$BA,$00,$A8,$FF,$00,$FF,$00
@@ -218,95 +212,144 @@ levelColorScheme
         .BYTE $04,$02,$03,$06,$07,$08
         .BYTE $08,$06,$05,$02,$03,$06,$08,$0B
         .BYTE $07,$06,$05,$02,$03
-	
+
 f33C6   .BYTE $06,$08,$0B,$07,$06,$04,$02,$03
         .BYTE $06,$07,$08,$08,$06,$00,$00,$00
 f33D6   .BYTE $00,$00,$00,$00,$00,$00,$00,$00
         .BYTE $00,$00,$00,$10,$11,$0F,$0D,$0C
 f33E6   .BYTE $00,$0B
-
-player1Text
-        .BYTE $00,$01
-        .byte "Player1", $FF
-player2Text
-        .BYTE $00,$1F
-        .byte "Player2", $FF
-oneUpText
-        .BYTE $00,$01
-	.byte $01,$1e,$19,$30,$7A,$7B
-        ;.byte "1up ", $7A, $7B
-livesLeftPlayerOneText
-        .BYTE $30,$03,$FF
-
-livesLeftPlayerTwoText = *+$04
-twoUpText
-        .BYTE $00,$1F
-        ;.byte "", $7A, "", $7B, " 3 2up", $FF, ""
-        .byte $7A, $7B, " 3 2up", $FF
-spaces
-        .BYTE $00,$0F
-	.byte $30,$30,$30,$30,$30,$30,$30,$30,$30,$30,$30,$ff
-;        .byte "           ", $FF
-landNowText
-        .BYTE $00,$0F
-        ;.byte "Land now!", $FF
-	.byte $45,$0a,$17,$0d,$30,$17,$18,$54,$25,$ff
+f33E8   .BYTE $0D,$10,$11,$0E,$0D,$0B,$00,$0C
+        .BYTE $0D,$10,$11,$0E,$0D,$0B
+scoresForHittingStructuresArray
+        .BYTE $00,$0C,$0D,$10,$11,$0F,$0D,$0C
+        .BYTE $00,$0B,$0D,$00,$00,$00,$00,$00
+        .BYTE $00,$00,$00,$00,$00,$00,$00,$00
+        .BYTE $00
+colorLineHiPtrArray
+        .BYTE $D8,$D8,$D8,$D8,$D8,$D8,$D8,$D9
+        .BYTE $D9,$D9,$D9,$D9,$D9,$DA,$DA,$DA
+        .BYTE $DA,$DA,$DA,$DA,$DB,$DB,$DB,$DB
+        .BYTE $DB,$80,$80,$80,$80,$00,$00,$00
+        .BYTE $80,$80,$80,$80,$80,$00,$00,$00
+        .BYTE $80,$80,$80,$80,$80,$00,$00,$00
+        .BYTE $80,$80,$80,$80,$80,$00,$00,$00
+        .BYTE $80,$80,$80,$81,$81,$81,$80,$80
+        .BYTE $80,$80,$81,$81,$81,$80,$80,$00
+        .BYTE $01,$00,$01,$00,$01,$02,$00,$01
+        .BYTE $02,$00,$01,$02,$00,$00,$00,$00
+        .BYTE $00,$02,$02,$00,$00,$00,$02,$02
+        .BYTE $02,$04,$04,$04,$00,$00,$00,$01
+        .BYTE $01,$01,$01,$02,$02,$02,$02,$02
+        .BYTE $02,$02,$02,$02,$00,$00,$00,$02
+        .BYTE $02,$02,$02,$04,$04,$04,$04,$04
+        .BYTE $04,$04,$04,$04,$01,$01,$01
+initialPlayerScore
+        .BYTE $00,$00,$00,$00,$00,$03,$01,$01
+        .BYTE $00
+f349F   .BYTE $4E,$1B,$12,$0D,$12,$1E,$42,$30
+        .BYTE $0B,$22,$30,$3A,$17,$0D,$1B,$0E
+        .BYTE $54,$30,$3B,$1B,$0A,$22,$0B,$1B
+        .BYTE $18,$18,$14,$28,$30,$41,$12,$10
+        .BYTE $11,$30,$2E
 
 pauseText
         .BYTE $00,$0F
 ;        .BYTE "  Pause   ", $FF
 	.byte $30,$30,$49,$0a,$1e,$1c,$0e,$30,$30,$30,$ff
 	
+player1Text
+        .BYTE $00,$01
+        .BYTE $49, $15, $0a, $22, $0e, $1b, $01, $FF
+;        .TEXT "Player1", $FF
+player2Text
+        .BYTE $00,$1F
+        .BYTE $49, $15, $0a, $22, $0e, $1b, $02, $FF
+;        .TEXT "Player2", $FF
+oneUpText
+        .BYTE $00,$01
+        .BYTE $01, $1e, $19, $30, $7A, $7B
+;        .TEXT "1up ", $7A, $7B
+livesLeftPlayerOneText
+        .BYTE $30,$03,$FF
+
+livesLeftPlayerTwoText = *+$04
+twoUpText
+        .BYTE $00,$1F
+        .BYTE $7A, $7B, $30, $03, $30, $02, $1e, $19, $FF
+;        .TEXT "", $7A, "", $7B, " 3 2up", $FF, ""
+spaces
+        .BYTE $00,$0F
+        .BYTE $30, $30, $30, $30, $30, $30, $30, $30, $30, $30, $30, $FF
+;        .TEXT "           ", $FF
+landNowText
+        .BYTE $00,$0F
+        .BYTE $45, $0a, $17, $0d, $30, $17, $18, $54, $25, $FF
+;        .TEXT "Land now!", $FF
+
 player1
         .BYTE $0A,$0F
-        .byte "Player 1", $FF
+        .BYTE $49, $15, $0a, $22, $0e, $1b, $30, $01, $FF
+;        .TEXT "Player 1", $FF
 player2
         .BYTE $0A,$0F
-        .byte "Player 2", $FF
+        .BYTE $49, $15, $0a, $22, $0e, $1b, $30, $02, $FF
+;        .TEXT "Player 2", $FF
 gameOn
         .BYTE $0D,$0E
-        .byte 'Game On!', $FF
+        .BYTE $40, $0a, $42, $0e, $30, $48, $17, $25, $FF
+;        .TEXT "Game On!", $FF
 
 tensLivesLeftDisplayed = *+$02
 livesLeftDisplayed = *+$03
 livesLeftText
         .BYTE $10,$0E
-        .byte " 3     left.", $FF
+        .BYTE $30, $03, $30, $30, $30, $30, $30, $15, $0e, $0f, $1d, $28, $FF
+;        .TEXT " 3     left.", $FF
 gameOver
         .BYTE $0D,$0D
-        .byte "Game Over!", $FF
+        .BYTE $40, $0a, $42, $0e, $30, $48, $1f, $0e, $1b, $25, $FF
+;        .TEXT "Game Over!", $FF
 
 destructSequencePrimed
         .BYTE $07,$07
-        .byte "Destruct sequence primed!", $FF
+        .BYTE $3d, $0e, $1c, $1d, $1b, $1e, $0c, $1d, $30, $1c, $0e, $1a, $1e, $0e, $17, $0c, $0e, $30, $19, $1b, $12, $42, $0e, $0d, $25, $FF
+;        .TEXT "Destruct sequence primed!", $FF
 formationAnnihilationBonusText
         .BYTE $0A,$05
-        .byte "Formation annihilation bonus:", $FF
+        .BYTE $3f, $18, $1b, $42, $0a, $1d, $12, $18, $17, $30, $0a, $17, $17, $12, $11, $12, $15, $0a, $1d, $12, $18, $17, $30, $0b, $18, $17, $1e, $1c, $2a, $FF
+;        .TEXT "Formation annihilation bonus:", $FF
 shipDestructBonusText
         .BYTE $10,$0A
-        .byte "Ship destruct bonus:"
-        .byte $FF
+        .BYTE $4c, $11, $12, $19, $30, $0d, $0e, $1c, $1d, $1b, $1e, $0c, $1d, $30, $0b, $18, $17, $1e, $1c, $2a
+;        .TEXT "Ship destruct bonus:"
+        .BYTE $FF
+;        .TEXT "", $FF
 
 scoreBonusMultiplierValue = *+$08
 scoreBonusResult = *+$0D
 scoreBonusText
         .BYTE $0D,$0D
-        .byte "100 X 00 = 0000", $FF
+        .BYTE $01, $00, $00, $30, $51, $30, $00, $00, $30, $2f, $30, $00, $00, $00, $00, $FF
+;        .TEXT "100 X 00 = 0000", $FF
 youveAmassedAHighScore
         .BYTE $0D,$04
-        .byte "You have amassed a great score!", $FF
+        .BYTE $52, $18, $1e, $30, $11, $0a, $1f, $0e, $30, $0a, $42, $0a, $1c, $1c, $0e, $0d, $30, $0a, $30, $10, $1b, $0e, $0a, $1d, $30, $1c, $0c, $18, $1b, $0e, $25, $FF
+;        .TEXT "You have amassed a great score!", $FF
 pleaseEnterYourInitials
         .BYTE $10,$06
-        .byte "Please enter your initials.", $FF
+        .BYTE $49, $15, $0e, $0a, $1c, $0e, $30, $0e, $17, $1d, $0e, $1b, $30, $22, $18, $1e, $1b, $30, $12, $17, $12, $1d, $12, $0a, $15, $1c, $28, $FF
+;        .TEXT "Please enter your initials.", $FF
 
 initialOne = *+$02
 initial2 = *+$03
 initial3 = *+$04
 initialsInputField
         .BYTE $13,$11
-        .byte "A..   ", $FF
+        .BYTE $3a, $28, $28, $30, $30, $30, $FF
+;        .TEXT "A..   ", $FF
 alphabetText
-        .byte "ABCDEFGHIJKLMNOPQRSTUVWXYZ "
+        .BYTE $3a, $3b, $3c, $3d, $3e, $3f, $40, $41, $16, $43, $44, $45, $46, $47, $48, $49, $4a, $4b, $4c, $4d, $4e, $4f, $50, $51, $52, $53, $30
+;        .TEXT "ABCDEFGHIJKLMNOPQRSTUVWXYZ "
 miniGameColorSequence3   .BYTE M_WHITE,M_GRAY3,M_GRAY2,M_GRAY1,M_BLACK
 miniGameColorSequence1   .BYTE M_GRAY3,M_GRAY2,M_GRAY1,M_BLACK,M_BLACK
 miniGameColorSequence2   .BYTE M_GRAY1,M_GRAY1,M_BLACK,M_BLACK,M_BLACK

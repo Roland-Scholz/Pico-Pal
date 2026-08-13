@@ -1,19 +1,17 @@
-notUsed = $8010 
+notUsed = $8010
+
+mainCharset = $00
 surfaceCharset1 = $0100
 surfaceCharset2 = $0200
 surfaceCharset3 = $0300
 
-;charsetArray
-;	.byte $00,$08,$00,$08,$00,$00,$08,$04
-;       .byte $00,$04,$08,$00,$08,$04,$00,$08
-
 levelColorBak
-	.byte $00,$74,$00,$00,$00,$00,$c8,$36
-	.byte $00,$64,$00,$00,$82,$00,$00
+	.byte $00,$00,$74,$00,$00,$00,$00,$c8,$36
+	.byte $00,$64,$00,$00,$82,$00
 
 levelColorPf0
-	.byte $08,$06,$16,$08,$ba,$fa,$a8,$06
-	.byte $88,$06,$16,$ba,$04,$86,$18
+	.byte $00,$08,$06,$16,$08,$ba,$fa,$a8,$06
+	.byte $88,$06,$16,$ba,$04,$86
 
 dreadnoughtDataForLevelLoPtrArray ;= $E010
         .BYTE <notUsed,<levelOneDreadnoughtData,<level2DreadnoughtData,<level3DreadnoughtData
@@ -27,7 +25,7 @@ dreadnoughtDataForLevelHiPtrArray ;= $E020
         .BYTE >level12DreadnoughtData,>level13DreadnoughtData,>level14DreadnoughtData,>level15DreadnoughtData
 
 levelSurfaceDataHiPtrArray ;= $E040
-        .BYTE >surfaceCharset2,>surfaceCharset3,>surfaceCharset1,>surfaceCharset3,>surfaceCharset1,>surfaceCharset2,>surfaceCharset3,>surfaceCharset2
+        .BYTE >mainCharset,>surfaceCharset3,>surfaceCharset1,>surfaceCharset3,>surfaceCharset1,>surfaceCharset2,>surfaceCharset3,>surfaceCharset2
         .BYTE >surfaceCharset1,>surfaceCharset2,>surfaceCharset3,>surfaceCharset1,>surfaceCharset3,>surfaceCharset2,>surfaceCharset1,>surfaceCharset3
 
 textureDataForLevelLoPtrArray
@@ -42,64 +40,73 @@ textureDataForLevelHiPtrArray
         .BYTE >level8DreadnoughtData,>level9DreadnoughtData,>level10DreadnoughtData,>level11DreadnoughtData
         .BYTE >level12DreadnoughtData,>level13DreadnoughtData,>level14DreadnoughtData,>level15DreadnoughtData
 	
-levelNameLoPtrArray ;= $E050
-        .BYTE <level1Name,<level2Name,<level3Name,<level4Name,<level5Name,<level6Name,<level7Name
+levelNameLoPtrArray
+        .BYTE <level1Name,<level1Name,<level2Name,<level3Name,<level4Name,<level5Name,<level6Name,<level7Name
         .BYTE <level8Name,<level9Name,<level10Name,<level11Name,<level12Name,<level13Name,<level14Name,<level15Name
-levelNameHiPtrArray ;= $E060
-        .BYTE >level1Name,>level2Name,>level3Name,>level4Name,>level5Name,>level6Name,>level7Name
+levelNameHiPtrArray
+        .BYTE >level1Name,>level1Name,>level2Name,>level3Name,>level4Name,>level5Name,>level6Name,>level7Name
         .BYTE >level8Name,>level9Name,>level10Name,>level11Name,>level12Name,>level13Name,>level14Name,>level15Name
-level1Name ;= $E070
+level1Name
         .BYTE $02,$0C
-        ;.BYTE "    01. Zinc.    ", $FF
-	.byte $30,$30,$30,$30,$53,$12,$17,$0c,$28,$30,$30,$30,$30,$30,$ff
-	
-level2Name ;= $E084
+        .BYTE $30, $30, $30, $30, $00, $01, $28, $30, $53, $12, $17, $0c, $28, $30, $30, $30, $30, $FF
+;        .TEXT "    01. Zinc.    ", $FF, ""
+level2Name
         .BYTE $02,$0C
-;        .BYTE "    02. Lead.    ", $FF
-	.byte $30,$30,$30,$30,$00,$02,$28,$30
-	.byte $45,$0e,$0a,$0d,$28
-	.byte $30,$30,$30,$30,$ff
-level3Name ;= $E098
+        .BYTE $30, $30, $30, $30, $00, $02, $28, $30, $45, $0e, $0a, $0d, $28, $30, $30, $30, $30, $FF
+;        .TEXT "    02. Lead.    ", $FF, ""
+level3Name
         .BYTE $02,$0C
-        .BYTE "   03. Copper.   ", $FF
-level4Name ;= $E0AC
+        .BYTE $30, $30, $30, $00, $03, $28, $30, $3c, $18, $19, $19, $0e, $1b, $28, $30, $30, $30, $FF
+;        .TEXT "   03. Copper.   ", $FF, ""
+level4Name
         .BYTE $02,$0C
-        .BYTE "   04. Silver.   ", $FF
-level5Name ;= $E0C0
+        .BYTE $30, $30, $30, $00, $04, $28, $30, $4c, $12, $15, $1f, $0e, $1b, $28, $30, $30, $30, $FF
+;        .TEXT "   04. Silver.   ", $FF, ""
+level5Name
         .BYTE $02,$0C
-        .BYTE "    05. Iron.     ", $FF
-level6Name ;= $E0D5
+        .BYTE $30, $30, $30, $30, $00, $05, $28, $30, $16, $1b, $18, $17, $28, $30, $30, $30, $30, $30, $FF
+;        .TEXT "    05. Iron.     ", $FF, ""
+level6Name
         .BYTE $02,$0C
-        .BYTE "    06. Gold.    ", $FF
-level7Name ;= $E0E9
+        .BYTE $30, $30, $30, $30, $00, $06, $28, $30, $40, $18, $15, $0d, $28, $30, $30, $30, $30, $FF
+;        .TEXT "    06. Gold.    ", $FF, ""
+level7Name
         .BYTE $02,$0C
-        .BYTE "  07. Platinum. ", $FF
+        .BYTE $30, $30, $00, $07, $28, $30, $49, $15, $0a, $1d, $12, $17, $1e, $42, $28, $30, $FF
+;        .TEXT "  07. Platinum. ", $FF, ""
         .BYTE $00,$FF,$00,$FF
-;*=$8F55
-level8Name ;= $EF55
+level8Name
         .BYTE $02,$0C
-        .BYTE "  08. Tungsten.  ", $FF
-level9Name ;= $EF69
+        .BYTE $30, $30, $00, $08, $28, $30, $4d, $1e, $17, $10, $1c, $1d, $0e, $17, $28, $30, $30, $FF
+;        .TEXT "  08. Tungsten.  ", $FF, ""
+level9Name
         .BYTE $02,$0C
-        .BYTE "   09. Iridon.    ", $FF
-level10Name ;= $EF7E
+        .BYTE $30, $30, $30, $00, $09, $28, $30, $16, $1b, $12, $0d, $18, $17, $28, $30, $30, $30, $30, $FF
+;        .TEXT "   09. Iridon.    ", $FF, ""
+level10Name
         .BYTE $02,$0C
-        .BYTE "  10. Kallisto.  ", $FF
-level11Name ;= $EF92
+        .BYTE $30, $30, $01, $00, $28, $30, $44, $0a, $15, $15, $12, $1c, $1d, $18, $28, $30, $30, $FF
+;        .TEXT "  10. Kallisto.  ", $FF, ""
+level11Name
         .BYTE $02,$0C
-        .BYTE " 11. Tri-alloy.  ", $FF
-level12Name ;= $EFA6
+        .BYTE $30, $01, $01, $28, $30, $4d, $1b, $12, $2e, $0a, $15, $15, $18, $22, $28, $30, $30, $FF
+;        .TEXT " 11. Tri-alloy.  ", $FF, ""
+level12Name
         .BYTE $02,$0C
-        .BYTE " 12. Quadmium. ", $FF
-level13Name ;= $EFB8
+        .BYTE $30, $01, $02, $28, $30, $4a, $1e, $0a, $0d, $42, $12, $1e, $42, $28, $30, $FF
+;        .TEXT " 12. Quadmium. ", $FF, ""
+level13Name
         .BYTE $02,$0C
-        .BYTE "  13. Ergonite.  ", $FF
-level14Name ;= $EFCC
+        .BYTE $30, $30, $01, $03, $28, $30, $3e, $1b, $10, $18, $17, $12, $1d, $0e, $28, $30, $30, $FF
+;        .TEXT "  13. Ergonite.  ", $FF, ""
+level14Name
         .BYTE $02,$0C
-        .BYTE " 14. Galactium. ", $FF
-level15Name ;= $EFDF
+        .BYTE $30, $01, $04, $28, $30, $40, $0a, $15, $0a, $0c, $1d, $12, $1e, $42, $28, $30, $FF
+;        .TEXT " 14. Galactium. ", $FF, ""
+level15Name
         .BYTE $02,$0C
-        .BYTE "  15. Uridium.  ", $FF
+        .BYTE $30, $30, $01, $05, $28, $30, $4e, $1b, $12, $0d, $12, $1e, $42, $28, $30, $30, $FF
+;        .TEXT "  15. Uridium.  ", $FF, ""
 
         .BYTE $00,$00,$00,$00,$00,$00
         .BYTE $00,$00,$00,$00,$00,$00,$00,$00	

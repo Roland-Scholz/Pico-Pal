@@ -44,6 +44,7 @@ aF9 = $F9
 RAM_ACCESS_MODE = $01
 currentSpriteMSB = $02
 spriteMixerValue = $03
+
 spriteIndex = $04
 currentSpriteXPos = $05
 currentSpriteMSBXPosOffset = $06
@@ -55,6 +56,7 @@ currentSpriteMultiColorMode = $0B
 currentSpriteExpandHorizontal = $0C
 currentSpriteColor = $0D
 currentSpriteValue = $0E
+
 secondHalfOfMap = a0F
 pixelYPositionOfPlayerBullet = a0F
 a0F = $0F
@@ -276,7 +278,7 @@ DOWN			= $0f
 ; $9e00 - $afff		17x512 bytes surface char data
 ;------------------------------------------------------------
 SCREEN_RAM_HIBANK = $4800
-sprite0Ptr = SCREEN_RAM_HIBANK + $03F8
+;sprite0Ptr = SCREEN_RAM_HIBANK + $03F8
 
 
 surfaceStructureDataLoPtrArray = $c000
@@ -328,23 +330,157 @@ explosion_major46	= 46
 
 restart		jsr initLevel
 		;jsr UpdateLivesLeft
-		jmp MaybeStartNewLevel
+		;jmp MaybeStartNewLevel
 
+;--------------------------------------------------------------------
+; DrawEnterLevelSequence
+;--------------------------------------------------------------------
+DrawEnterLevelSequence
+        LDX #$08
+b0B67   LDA initialPlayerScore,X
+        STA BackedUpPlayerOneScore,X
+        STA BackedUpPlayerTwoScore,X
+        STA playerScore,X
+        DEX
+        BPL b0B67
 
+        LDA #$12
+        STA soundOrTitleSelector
+        LDA #$02
+        STA currentPlayer
+        JSR UpdateLivesLeft
+        LDA #$2F
+        STA charsetSwitcher
+        LDA #$01
+        STA currentPlayer
+        LDA #$02
+        STA pausedOrNotPaused
+        LDA #$09
+        STA indexToTextureSegment
+        LDA #$1F
+        STA xPosForPlayerScoreDisplay
+        JSR UpdatePlayerScore
+        LDA #$01
+        STA xPosForPlayerScoreDisplay
+        JSR UpdatePlayerScore
+	
+;--------------------------------------------------------------------
+; RestartLevel
+;--------------------------------------------------------------------
+RestartLevel
+        LDX #$08
+        LDA playerAndJoystickMode
+        CMP #$01
+        BEQ b0BCC
+        LDA currentPlayer
+        CMP #$01
+        BEQ b0BCC
+
+        ; Player 2
+b0BAF   LDA BackedUpPlayerTwoScore,X
+        STA playerScore,X
+        DEX
+        BPL b0BAF
+
+        LDA #$1F
+        STA xPosForPlayerScoreDisplay
+        LDA currentPlayerLivesLeft
+        BNE b0BF2
+        LDX #$08
+        DEC currentPlayer
+        LDA $0255
+        BNE b0BCC
+        JMP GameOverCheckHiScore
+
+        ; Player 1
+b0BCC   LDA BackedUpPlayerOneScore,X
+        STA playerScore,X
+        DEX
+        BPL b0BCC
+
+        LDA #$01
+        STA xPosForPlayerScoreDisplay
+        LDA currentPlayerLivesLeft
+        BNE b0BF2
+        LDX #$08
+        LDA playerAndJoystickMode
+        CMP #$01
+        BNE b0BE8
+        JMP GameOverCheckHiScore
+
+b0BE8   INC currentPlayer
+        LDA $0265
+        BNE b0BAF
+        JMP GameOverCheckHiScore
+
+b0BF2   LDA playerAndJoystickMode
+        BNE EnterNewLevel
+        LDA currentPlayer
+        CMP #$01
+
+        ; Player 2
+        BEQ b0C09
+        LDX #<$DC00
+        LDY #>$DC00
+;        STX joystick1LoPtr
+;        STY joystick1HiPtr
+        JMP j0C13
+
+        ; Player 1
+b0C09   LDX #<$DC01
+        LDY #>$DC01
+;        STX joystick1LoPtr
+;        STY joystick1HiPtr
+j0C13;   STX joystick2LoPtr
+      ;  STY joystick2HiPtr
+	
 ;--------------------------------------------------------------------
 ; EnterNewLevel
 ;--------------------------------------------------------------------
 EnterNewLevel
         ;JSR SetInterruptToIRQInterrupt1
+	lda #150
+	jsr waitvcnt
+	
+	lda #0
+	sta shaftPos0
+	sta shaftPos1
+	sta hposp2
+	sta hposp3
+
+	jsr switchMono
+	jsr clearStarfield
+
+	lda currentLevel
+	pha
+	lda #0
+	sta currentLevel
+	
+	lda #$0f
+	sta backgroundColor1
+	lda #$00
+	sta backgroundColor2
+	
+	lda #40
+	sta srcWidthLo
+	lda #0
+	sta srcWidthHi
+	
+	lda #<dreadnaught
+	sta scrollPositionLoPtr
+	lda #>dreadnaught
+	sta scrollPositionHiPtr
+	
         LDX #<spaces
         LDY #>spaces
         JSR WriteToScreen
         JSR UpdateLivesLeft
+
         ;JSR UpdatePlayerDecalColors
-;       LDA #$00
-;       STA $D015    ;Sprite display Enable
-;        LDA #$30
-;        JSR Write21LinesOfAccumulatorValToScreen
+        LDA #$00
+        STA VIC_d015						;Sprite display Enable
+        LDA #$30
+        JSR Write21LinesOfAccumulatorValToScreen
 
         ;LDX #<newLevelColors
         ;LDY #>newLevelColors
@@ -393,10 +529,10 @@ b0C71   STX tensLivesLeftDisplayed
         LDX #<uridiumDecal
         LDY #>uridiumDecal
         JSR WriteToScreen
-;       LDA #M_WHITE
-;       STA $D026    ;Sprite Multi-Color Register 1
-;       LDA #$FE
-;       STA $D025    ;Sprite Multi-Color Register 0
+	LDA #M_WHITE
+	STA vic_d026    ;Sprite Multi-Color Register 1
+        LDA #$FE
+	STA vic_d025    ;Sprite Multi-Color Register 0
         LDX #<spriteVariablesManta
         LDY #>spriteVariablesManta
         STX spriteVariablesLoPtr
@@ -414,14 +550,18 @@ b0C71   STX tensLivesLeftDisplayed
         LDA #$BF
         STA someKindOfFrameRate
 	
-	jsr char2title
-	
 	lda #<surfaceDataForCurrentLevel
 	sta scrollPositionLoPtr
 	lda #>surfaceDataForCurrentLevel
 	sta scrollPositionHiPtr
 	
-SpinningShipAnimationLoop	
+SpinningShipAnimationLoop
+	lda #0
+	sta dbgpos
+	
+	lda #EGO_CMD_DEBUG
+	sta EGO_REG_CMD
+	
         JSR CheckInputMaybeUpdateDecal
         LDA firePressed
         BEQ SpinningShipAnimationOver
@@ -435,7 +575,9 @@ SpinningShipAnimationLoop
         BCC b0CD1
         LDA #MANTA
         STA currentSpriteValue
-b0CD1   JSR DisplayCurrentSprite
+b0CD1   lda #$a6
+	sta currentSpriteXPos
+	JSR DisplayCurrentSprite
 	jsr char2gfx
 	jsr renderSprites
         JMP SpinningShipAnimationLoop
@@ -452,8 +594,8 @@ SpinningShipAnimationOver
         JSR UpdatePointersAndFetchSurfaceData
 	;JSR PlayShipDeploymentSequence
 
-;        LDA backgroundColor2
-;        STA $D02E    ;Sprite 7 Color
+        LDA backgroundColor2
+        STA vic_d02E						;Sprite 7 Color
         LDY #$07
 b0CF0   LDA someKindOfSettingArray,Y
         STA a35,Y
@@ -468,6 +610,26 @@ b0CF0   LDA someKindOfSettingArray,Y
 	lda #$40+8
 	sta colpm3
 	
+	lda scrollPositionLoPtr	
+	sta scrollPosLo	
+
+	jsr switchMulti
+	pla
+	sta currentLevel
+	
+	lda #$04
+	sta backgroundColor1
+	lda #$0f
+	sta backgroundColor2
+	
+	lda #0
+	sta srcWidthLo
+	lda #2
+	sta srcWidthHi
+	
+	LDA #$c0
+        STA VIC_d015						;Sprite display Enable
+	
 ;--------------------------------------------------------------------
 ; MainGameLoop
 ;--------------------------------------------------------------------
@@ -478,27 +640,9 @@ MainGameLoop
 	lda #112
 	jsr waitvcnt
 	
-	jsr getOption
-	lda pause
-	and #1
-	bne MainGameLoop
-	
 	lda #0
 	sta dbgpos
-	lda mantaCurrentYPos
-	jsr puthex
-	lda mantaTopCannonHiPtr
-	jsr puthex
-	lda mantaTopCannonLoPtr
-	jsr puthex
-;	lda mantaBottomCannonHiPtr
-;	jsr puthex
-;	lda mantaBottomCannonLoPtr
-;	jsr puthex
-	lda pixelYPositionOfPlayerBullet
-	jsr puthex
 	
-
         JSR AnimatePlayerBullet
         JSR ScrollShipSurface					;computes scrollPositionLo/HiPtr and coarse scroll
 	jsr char2gfx
@@ -506,11 +650,8 @@ MainGameLoop
 	jsr char2title
 	jsr renderSprites
 
-	jsr moveShaft
 	jsr checkShaftAll
-
-	lda positionInsideScrollSegment
-	sta posScrollSeg
+	jsr moveShaft
 	
         JSR UpdateScrollPositionUsingDirectionAndSpeed
 ;        JSR AddStarsBehindDreadnought
@@ -536,9 +677,8 @@ mainGameLoopHiPtr   =*+$02
         JSR MaybeMoveLeft
         JSR MaybeMoveRight					;updates e.g. mantaDirectionAndSpeed
         JSR UpdateABunchOfGameVariables				;updates e.g. mantaDirectionAndSpeed
-
+	
         JSR AnimateMantaShip
-
 	
         ;JSR CheckLandNowWarning
         LDA landNowActivated
@@ -548,7 +688,153 @@ mainGameLoopHiPtr   =*+$02
 b0D41   LDA hasShipBeenHit
         BEQ MainGameLoop
 	
-	bne MainGameLoop
+;--------------------------------------------------------------------
+; MaybeStartNewLevel
+;--------------------------------------------------------------------
+MaybeStartNewLevel
+        LDA currentLevel
+        CMP indexToCurrentLevelTextureData
+        BEQ CheckIfGameIsOver
+        STA indexToCurrentLevelTextureData
+        CMP #$10
+        BCC b0D62
+        LDA #$01
+        STA currentLevel
+        STA indexToCurrentLevelTextureData
+
+        LDA selectForBulletsOrMines
+        CLC
+        ADC #$10
+        CMP #$40
+        BCS b0D62
+        STA selectForBulletsOrMines
+
+b0D62   LDA #$00
+        STA indexCurrentEnemyFormation
+        JMP EnterNewLevel
+        ; Doesn't return here, enters main game loop.
+
+;--------------------------------------------------------------------
+; MaybeStartNewLevel
+;--------------------------------------------------------------------
+CheckIfGameIsOver
+        JSR ShipHasBeenHit
+
+        LDA indexCurrentEnemyFormation
+        SEC
+        SBC #$04
+        BPL b0D75
+        LDA #$00
+b0D75   STA indexCurrentEnemyFormation
+        SED
+        SEC
+
+        ; Check if there any lives left.
+        LDA currentPlayerLivesLeft
+a0D7C   =*+$01
+        SBC #$01
+        STA currentPlayerLivesLeft
+        CLD
+        BNE ShouldRestartLevel
+
+        ; Game is over
+        JSR UpdateLivesLeft
+        ;JSR SetInterruptToIRQInterrupt1
+        LDA #$30
+        JSR Write21LinesOfAccumulatorValToScreen
+	
+        ;LDX #<COLOR_RAM + $00A0
+        ;LDY #>COLOR_RAM + $00A0
+        ;STX ramLoPtr
+        ;STY ramHiPtr
+        ;LDX #<gameOverColors
+        ;LDY #>gameOverColors
+        ;STX srcLoPtr
+        ;STY srcHiPtr
+        ;LDY #$0A
+        ;JSR WriteSourceValueToRam
+
+        LDA currentPlayer
+        CMP #$01
+        BEQ UpdatePlayerOneAndDrawGameOverScreen
+
+        ; Player 2
+        LDX #<player2
+        LDY #>player2
+        JSR WriteToScreen
+        JMP DrawGameOverScreen
+        ;Returns
+
+;--------------------------------------------------------------------
+; UpdatePlayerOneAndDrawGameOverScreen
+;--------------------------------------------------------------------
+UpdatePlayerOneAndDrawGameOverScreen
+        LDX #<player1
+        LDY #>player1
+        JSR WriteToScreen
+        ; Falls through
+
+;--------------------------------------------------------------------
+; DrawGameOverScreen
+;--------------------------------------------------------------------
+DrawGameOverScreen
+        LDX #<gameOver
+        LDY #>gameOver
+        JSR WriteToScreen
+        LDX #<spaces
+        LDY #>spaces
+        JSR WriteToScreen
+        LDA #$1C
+        STA soundVariable1
+        LDA #$1D
+        STA soundVariable2
+        LDA #$1E
+        STA soundVariable3
+
+        LDA #$90
+        STA someKindOfFrameRate
+b0DD7   JSR CheckInputMaybeUpdateDecal
+        LDA firePressed
+        BEQ b0DE2
+        LDA someKindOfFrameRate
+        BNE b0DD7
+
+b0DE2   JSR SpinWaitingForJoystickInput
+        JSR DisplayHiScoreInputScreen
+	
+;--------------------------------------------------------------------
+; ShouldRestartLevel
+;--------------------------------------------------------------------
+ShouldRestartLevel
+        JSR UpdateLivesLeft
+        LDX #$08
+        LDA currentPlayer
+        CMP #$01
+        BEQ b0E02
+
+        ; Player 2
+b0DF3   LDA playerScore,X
+        STA BackedUpPlayerTwoScore,X
+        DEX
+        BPL b0DF3
+        LDA #$01
+        STA currentPlayer
+        JMP RestartLevel
+
+        ; Player 1
+b0E02   LDA playerScore,X
+        STA BackedUpPlayerOneScore,X
+        DEX
+        BPL b0E02
+        LDA playerAndJoystickMode
+        STA currentPlayer
+        CMP #$01
+        BEQ b0E16
+
+        ; Player 2
+        LDA #$02
+        STA currentPlayer
+b0E16   JMP RestartLevel
 	
 	
 ;-------------------------------------------------------------------
@@ -657,8 +943,6 @@ DrawMantaAnimationFrame
         ; Draw the Manta's shadow.
         INC spriteIndex
         JSR GetCurrentSprite
-	lda #$ff
-	sta currentSpriteDisplayEnable
         LDA mantaShadowSpriteValue
         STA currentSpriteValue
         LDA mantaShadowOffset
@@ -666,19 +950,273 @@ DrawMantaAnimationFrame
         CLC
         ADC mantaCurrentYPos
         STA currentSpriteYPos
-        LDA #MANTA_HORIZONTAL_POSITION-12
+        LDA #MANTA_HORIZONTAL_POSITION-2
         CLC
         ADC mantaShadowOffset
         STA currentSpriteXPos
         JSR DisplayCurrentSprite
         ; Falls through
-;	lda someKindOfFrameRate
-;	bne UpdateABunchOfGameVariables
+
+;-------------------------------------------------------------------
+; UpdateCannonsInSomeWay (collision detection)
+;-------------------------------------------------------------------
+UpdateCannonsInSomeWay
+        LDY newSpriteValue
+        LDA f33E8,Y
+        STA a56
+        AND #$01
+        STA a57
+        TAY
+        BNE b27FD
+        LDA (mantaTopCannonLoPtr),Y
+        BPL b27EF
+        CMP #$90
+        BCS b27EF
+a27EC   =*+$01
+        LDA #$80
+        STA hasShipBeenHit
+b27EF   LDY #$02
+        LDA (mantaTopCannonLoPtr),Y
+        BPL b27FD
+        CMP #$90
+        BCS b27FD
+a27FA   =*+$01
+        LDA #$80
+        STA hasShipBeenHit
+b27FD   LDY #$01
+        LDA (mantaTopCannonLoPtr),Y
+        STA a86
+        BPL b280D
+        CMP #$90
+        BCS b280D
+a280A   =*+$01
+        LDA #$80
+        STA hasShipBeenHit
+b280D   LDA a56
+        BPL b2838
+        DEC mantaTopCannonHiPtr
+        DEC mantaTopCannonHiPtr
+        LDA (mantaTopCannonLoPtr),Y
+        BPL b2821
+        CMP #$90
+        BCS b2821
+a281E   =*+$01
+        LDA #$80
+        STA hasShipBeenHit
+b2821   LDA mantaTopCannonHiPtr
+        CLC
+        ADC #$04
+        STA mantaTopCannonHiPtr
+        LDA (mantaTopCannonLoPtr),Y
+        BPL b2834
+        CMP #$90
+        BCS b2834
+a2831   =*+$01
+        LDA #$80
+        STA hasShipBeenHit
+b2834   DEC mantaTopCannonHiPtr
+        DEC mantaTopCannonHiPtr
+b2838   RTS
+
+
+
+;-------------------------------------------------------------------
+; ShipHasBeenHit
+;-------------------------------------------------------------------
+ShipHasBeenHit
+        LDA #$00
+        ;STA $D015    ;Sprite display Enable
+        STA a3F
+        LDA #$06
+        STA loopCounter
+        LDA #$0C
+        STA soundVariable1
+        STA soundVariable2
+;        LDA #$F8
+;        STA $D026    ;Sprite Multi-Color Register 1
+;        LDA #$F0
+;        STA $D025    ;Sprite Multi-Color Register 0
+
+        LDX #<spriteVariablesExplosion
+        LDY #>spriteVariablesExplosion
+        STX spriteVariablesLoPtr
+        STY spriteVariablesHiPtr
+        JSR LoadSpriteVariablesAndDisplay
 	
-;	lda #EGO_CMD_DEBUG
-;	sta EGO_REG_CMD
-;	jsr waitstatus
+        LDA mantaCurrentYPos
+        STA currentSpriteYPos
+        JSR DisplayCurrentSprite
+
+j2488   LDA hasShipBeenHit					;stop manta
+        BPL b2490
+        LDA #$00
+        STA mantaDirectionAndSpeed
 	
+b2490   LDA loopCounter
+        BMI b24BF
+        LDA #$07
+        STA spriteIndex
+        ;JSR StoreShipSpriteState
+	jsr GetCurrentSprite
+        LDA loopCounter
+        STA spriteIndex
+        ;LDA $D41B    ; Random Number Generator
+	lda random
+;        AND #$0F
+        AND #$07
+        SEC
+;        SBC #$08
+        SBC #$04
+        CLC
+        ADC currentSpriteXPos
+        STA currentSpriteXPos
+        LDA #EXPLOSION_MAJOR1
+        STA currentSpriteValue
+	
+;        LDA $D41B    ; Random Number Generator
+	lda random
+        AND #$0F
+        SBC #$08
+        CLC
+        ADC currentSpriteYPos
+        STA currentSpriteYPos
+        JSR ApplySpriteVariablesAndDisplay
+b24BF   JSR ProcessGameFrameWithoutCheckingPause
+
+        ; Animte the ship explosion
+        LDA #$07
+        STA spriteIndex
+b24C6   JSR StoreShipSpriteState
+        INC currentSpriteValue
+        LDA currentSpriteValue
+        CMP #EXPLOSION_MAJOR11 + $01
+        BCC b24D5
+        LDA #$00
+        STA currentSpriteDisplayEnable
+b24D5   JSR ApplySpriteVariablesAndDisplay
+        DEC spriteIndex
+        BPL b24C6
+
+        JSR ProcessGameFrameWithoutCheckingPause
+        JSR ProcessGameFrameWithoutCheckingPause
+
+        LDA mantaDirectionAndSpeed
+        BEQ b2506
+        BMI b24F8
+        LDA a2D
+        SEC
+        SBC #$80
+        STA a2D
+        LDA mantaDirectionAndSpeed
+        SBC #$00
+        STA mantaDirectionAndSpeed
+        JMP j2508
+
+b24F8   CLC
+        LDA a2D
+        ADC #$80
+        STA a2D
+        BCC b2503
+        INC mantaDirectionAndSpeed
+b2503   JMP j2508
+
+b2506   STA a2D
+j2508   LDA pausedOrNotPaused
+        CMP #$02
+        BEQ b2515
+        LDA firePressed
+        BEQ b2523
+        JMP j2518
+
+b2515   JSR UpdatePlayerScore
+j2518   DEC loopCounter
+        LDA loopCounter
+        CMP #$F0
+        BEQ b2523
+        JMP j2488
+
+b2523	RTS
+
+;--------------------------------------------------------------------
+; ProcessGameFrameWithoutCheckingPause
+;--------------------------------------------------------------------
+ProcessGameFrameWithoutCheckingPause
+        ;LDA shouldWaitUntilReady
+        ;BNE ProcessGameFrameWithoutCheckingPause
+	
+	lda #112
+	jsr waitvcnt	
+	
+        JSR AnimatePlayerBullet
+        JSR UpdateScrollPositionUsingDirectionAndSpeed
+        JSR ScrollShipSurface
+	
+	jsr char2gfx
+	jsr stars2gfx
+	jsr char2title
+	jsr renderSprites
+
+
+        JSR AddStarsBehindDreadnought
+        ;JSR UpdateColorsOnScreen
+        JSR GetJoystickInput
+        LDA #$00
+        STA upPressed
+        STA rightPressed
+        INC someKindOfFrameRate
+        JSR MaybeMoveLeft
+        JSR MaybeMoveRight
+        JSR UpdateCannonsInSomeWay
+        RTS
+	
+;-------------------------------------------------------------------
+; StoreShipSpriteState
+;-------------------------------------------------------------------
+StoreShipSpriteState
+        LDY spriteIndex
+        LDA msbForSpriteArray,Y
+        STA currentSpriteMSB
+        EOR #$FF
+        STA spriteMixerValue
+        LDA vic_d027,Y						;Sprite 0 Color
+        STA currentSpriteColor
+        LDA sprite0Ptr,Y
+        STA currentSpriteValue
+        TYA
+        ASL
+        TAY
+        LDA vic_d000,Y						;Sprite 0 X Pos
+        STA currentSpriteXPos
+        LDA vic_d001,Y						;Sprite 0 Y Pos
+        STA currentSpriteYPos
+        LDA vic_d010						;Sprites 0-7 MSB of X coordinate
+        AND currentSpriteMSB
+        BEQ bB0BD
+        LDA #$FF
+bB0BD   STA currentSpriteMSBXPosOffset
+        LDA vic_d015						;Sprite display Enable
+        AND currentSpriteMSB
+        STA currentSpriteDisplayEnable
+        LDA vic_d017						;Sprites Expand 2x Vertical (Y)
+        AND currentSpriteMSB
+        STA currentSpriteExpandVertical
+        LDA vic_d01b						;Sprite to Background Display Priority
+        AND currentSpriteMSB
+        STA currentSpriteBackgroundDisplayPriority
+        LDA vic_d01c						;Sprites Multi-Color Mode Select
+        AND currentSpriteMSB
+        STA currentSpriteMultiColorMode
+        LDA vic_d01d						;Sprites Expand 2x Horizontal (X)
+        AND currentSpriteMSB
+        STA currentSpriteExpandHorizontal
+        RTS
+
+;-------------------------------------------------------------------
+; DisplayHiScoreInputScreen
+;-------------------------------------------------------------------
+DisplayHiScoreInputScreen
+	rts
+
 ;-------------------------------------------------------------------
 ; UpdateABunchOfGameVariables
 ;-------------------------------------------------------------------
@@ -777,49 +1315,25 @@ GetCurrentSprite
         LDY spriteIndex
         LDA msbForSpriteArray,Y
         STA currentSpriteMSB
-	
-	lda spriteShape,y
-	sta currentSpriteValue
-	
-	lda spriteXpos,y
-	asl
-	sta currentSpriteXPos
-	lda #0
-	rol
-	beq GetCurrentSprite1
-	lda #$ff
-GetCurrentSprite1	
-	sta currentSpriteMSBXPosOffset
-	
-	lda spriteYpos,y
-	sta currentSpriteYPos
-
-	lda spriteEna,y
-	sta currentSpriteDisplayEnable
-	rts
-	
-	
-	
-	
         EOR #$FF
         STA spriteMixerValue
-        LDA $D027,Y  ;Sprite 0 Color
+	lda vic_d027,y						;Sprite 0 Color
         STA currentSpriteColor
         LDA sprite0Ptr,Y
         STA currentSpriteValue
         TYA
         ASL
         TAY
-        LDA $D000,Y  ;Sprite 0 X Pos
+        LDA vic_d000,Y						;Sprite 0 X Pos
         STA currentSpriteXPos
-        LDA $D001,Y  ;Sprite 0 Y Pos
+        LDA vic_d001,Y						;Sprite 0 Y Pos
         STA currentSpriteYPos
-        LDA $D010    ;Sprites 0-7 MSB of X coordinate
+        LDA vic_d010						;Sprites 0-7 MSB of X coordinate
         AND currentSpriteMSB
         BEQ bB088
         LDA #$FF
 bB088   STA currentSpriteMSBXPosOffset
-        LDA $D015    ;Sprite display Enable
+        LDA vic_d015    					;Sprite display Enable
         AND currentSpriteMSB
         STA currentSpriteDisplayEnable
         RTS
@@ -1474,11 +1988,14 @@ jB050   lda trig0
 ; Write21LinesOfAccumulatorValToScreen
 ;-------------------------------------------------------------------
 Write21LinesOfAccumulatorValToScreen
-        LDX #<SCREEN_RAM_HIBANK + $00A0
-        LDY #>SCREEN_RAM_HIBANK + $00A0
+;        LDX #<SCREEN_RAM_HIBANK + $00A0
+ ;       LDY #>SCREEN_RAM_HIBANK + $00A0
+        LDX #<dreadnaught
+        LDY #>dreadnaught
         STX ramLoPtr
         STY ramHiPtr
-        LDX #$15
+;        LDX #$15
+        LDX #$11
         JSR WriteToRam
         RTS
 	
@@ -1494,6 +2011,7 @@ bB18D   STA (ramLoPtr),Y
         BCC bB18D
         DEX
         BEQ bB1A7
+
         CLC
         LDA ramLoPtr
         ADC #$28
@@ -1503,14 +2021,15 @@ bB18D   STA (ramLoPtr),Y
 bB1A2   LDA currentSpriteColor
         JMP jB18B
 
-bB1A7   CLC
-        CLC
-        LDA ramLoPtr
-        ADC #$28
-        STA ramLoPtr
-        BCC bB1B3
-        INC ramHiPtr
-bB1B3   RTS
+bB1A7   rts
+;	CLC
+;        ;CLC
+;        LDA ramLoPtr
+;        ADC #$28
+;        STA ramLoPtr
+;        BCC bB1B3
+;        INC ramHiPtr
+;bB1B3   RTS
 
 ;-------------------------------------------------------------------
 ; WriteSourceValueToRam
@@ -2267,136 +2786,84 @@ b1BF4   DEC dataIndex
 ; ApplySpriteVariablesAndDisplay
 ;-------------------------------------------------------------------
 ApplySpriteVariablesAndDisplay
-	jmp DisplayCurrentSprite
-	
         LDY spriteIndex
         LDA msbForSpriteArray,Y
         STA currentSpriteMSB
         EOR #$FF
         STA spriteMixerValue
         LDA currentSpriteColor
-        STA $D027,Y  ;Sprite 0 Color
+        STA vic_d027,Y						;Sprite 0 Color
         LDA currentSpriteMultiColorMode
         BEQ bB0FE
         LDA currentSpriteMSB
-        ORA $D01C    ;Sprites Multi-Color Mode Select
+        ORA vic_d01c						;Sprites Multi-Color Mode Select
         BNE bB103
-bB0FE   LDA $D01C    ;Sprites Multi-Color Mode Select
+bB0FE   LDA vic_d01c						;Sprites Multi-Color Mode Select
         AND spriteMixerValue
-bB103   STA $D01C    ;Sprites Multi-Color Mode Select
+bB103   STA vic_d01c						;Sprites Multi-Color Mode Select
         LDA currentSpriteExpandVertical
         BEQ bB111
         LDA currentSpriteMSB
-        ORA $D017    ;Sprites Expand 2x Vertical (Y)
+        ORA vic_d017						;Sprites Expand 2x Vertical (Y)
         BNE bB116
-bB111   LDA $D017    ;Sprites Expand 2x Vertical (Y)
+bB111   LDA vic_d017						;Sprites Expand 2x Vertical (Y)
         AND spriteMixerValue
-bB116   STA $D017    ;Sprites Expand 2x Vertical (Y)
+bB116   STA vic_d017						;Sprites Expand 2x Vertical (Y)
         LDA currentSpriteExpandHorizontal
         BEQ bB124
         LDA currentSpriteMSB
-        ORA $D01D    ;Sprites Expand 2x Horizontal (X)
+        ORA vic_d01D						;Sprites Expand 2x Horizontal (X)
         BNE bB129
-bB124   LDA $D01D    ;Sprites Expand 2x Horizontal (X)
+bB124   LDA vic_d01D						;Sprites Expand 2x Horizontal (X)
         AND spriteMixerValue
-bB129   STA $D01D    ;Sprites Expand 2x Horizontal (X)
+bB129   STA vic_d01D						;Sprites Expand 2x Horizontal (X)
         LDA currentSpriteBackgroundDisplayPriority
         BEQ bB137
         LDA currentSpriteMSB
-        ORA $D01B    ;Sprite to Background Display Priority
+        ORA vic_d01b						;Sprite to Background Display Priority
         BNE bB13C
-bB137   LDA $D01B    ;Sprite to Background Display Priority
+bB137   LDA vic_d01b						;Sprite to Background Display Priority
         AND spriteMixerValue
-bB13C   STA $D01B    ;Sprite to Background Display Priority
+bB13C   STA vic_d01b						;Sprite to Background Display Priority
 
 ;-------------------------------------------------------------------
 ; DisplayCurrentSprite
 ;-------------------------------------------------------------------
 DisplayCurrentSprite
         LDY spriteIndex
-	
-	lda currentSpriteDisplayEnable
-	sta spriteEna,y
-	lda currentSpriteValue
-	sta spriteShape,y
-	lda #1
-	cpy #7
-	bne DisplayCurrentSprite1
-	lda #2
-DisplayCurrentSprite1
-	sta spriteModus,y
-	lda currentSpriteMSBXPosOffset
-	lsr
-	lda currentSpriteXPos
-	ror
-	sta spriteXpos,y
-	lda currentSpriteYPos
-	sta spriteYpos,y
-	rts
-	
-;        LDA msbForSpriteArray,Y
-;        STA currentSpriteMSB
-;        EOR #$FF
-;        STA spriteMixerValue
-;        LDA currentSpriteValue
-;        STA sprite0Ptr,Y
-;        TYA
-;        ASL
-;        TAY
-;        LDA currentSpriteXPos
-;        STA $D000,Y  ;Sprite 0 X Pos
-;        LDA currentSpriteYPos
-;        STA $D001,Y  ;Sprite 0 Y Pos
-;        LDA currentSpriteMSBXPosOffset
-;        AND #$01
-;        STA currentSpriteMSBXPosOffset
-;        LDA currentSpriteMSBXPosOffset
-;        BEQ bB16D
-;        LDA currentSpriteMSB
-;        ORA $D010    ;Sprites 0-7 MSB of X coordinate
-;        BNE bB172
-;bB16D   LDA $D010    ;Sprites 0-7 MSB of X coordinate
-;        AND spriteMixerValue
-;bB172   STA $D010    ;Sprites 0-7 MSB of X coordinate
-;        LDA currentSpriteDisplayEnable
-;        BEQ bB180
-;        LDA currentSpriteMSB
-;        ORA $D015    ;Sprite display Enable
-;        BNE bB185
-;bB180   LDA $D015    ;Sprite display Enable
-;        AND spriteMixerValue
-;bB185   STA $D015    ;Sprite display Enable
-;        RTS	
-	
-;--------------------------------------------------------------------
-; MaybeStartNewLevel
-;--------------------------------------------------------------------
-MaybeStartNewLevel
-        LDA currentLevel
-        CMP indexToCurrentLevelTextureData
-        BEQ CheckIfGameIsOver
-        STA indexToCurrentLevelTextureData
-        CMP #$10
-        BCC b0D62
-        LDA #$01
-        STA currentLevel
-        STA indexToCurrentLevelTextureData
-
-        LDA selectForBulletsOrMines
-        CLC
-        ADC #$10
-        CMP #$40
-        BCS b0D62
-        STA selectForBulletsOrMines
-
-b0D62   LDA #$00
-        STA indexCurrentEnemyFormation
-        JMP EnterNewLevel
-        ; Doesn't return here, enters main game loop.
-	
-	
-CheckIfGameIsOver
-	jmp CheckIfGameIsOver
+        LDA msbForSpriteArray,Y
+        STA currentSpriteMSB
+        EOR #$FF
+        STA spriteMixerValue
+        LDA currentSpriteValue
+        STA sprite0Ptr,Y
+        TYA
+        ASL
+        TAY
+        LDA currentSpriteXPos
+        STA vic_d000,Y						;Sprite 0 X Pos
+        LDA currentSpriteYPos
+        STA vic_d001,Y						;Sprite 0 Y Pos
+        LDA currentSpriteMSBXPosOffset
+        AND #$01
+        STA currentSpriteMSBXPosOffset
+        LDA currentSpriteMSBXPosOffset
+        BEQ bB16D
+        LDA currentSpriteMSB
+        ORA vic_d010						;Sprites 0-7 MSB of X coordinate
+        BNE bB172
+bB16D   LDA vic_d010						;Sprites 0-7 MSB of X coordinate
+        AND spriteMixerValue
+bB172   STA vic_d010						;Sprites 0-7 MSB of X coordinate
+        LDA currentSpriteDisplayEnable
+        BEQ bB180
+        LDA currentSpriteMSB
+        ORA vic_d015						;Sprite display Enable
+        BNE bB185
+bB180   LDA vic_d015						;Sprite display Enable
+        AND spriteMixerValue
+bB185   STA vic_d015						;Sprite display Enable
+        RTS
 		
 ;-------------------------------------------------------------------
 ; SpinWaitingForJoystickInput
@@ -2735,6 +3202,7 @@ MaybeShowPauseScreen
         STA soundOrTitleSelector
         LDA #$03
         STA pausedOrNotPaused
+	jsr char2title
 
         ; Pause pressed. Wait to unpause.
 PauseLoop
@@ -2820,7 +3288,8 @@ ExitPauseScreen
         STA soundOrTitleSelector
         LDA #$02
         STA pausedOrNotPaused
-        RTS
+	jmp char2title
+;        RTS
 
 	
 ;--------------------------------------------------------------------
@@ -2941,7 +3410,6 @@ checkShaftAll	lda scrollPositionLoPtr
 		sta scrollPosLo
 		
 		lda mantaDirectionAndSpeed
-		beq checkShaftAllEx
 		bmi shaftLeft
 		bpl shaftRight
 checkShaftAllEx	rts
@@ -2959,7 +3427,7 @@ shaftRight	lda #0
 ;--------------------------------------------------------------------
 shaftLeft	lda #39
 		sta checkShaft2+1
-		lda #200
+		lda #204
 		sta checkShaft9+1
 
 ;--------------------------------------------------------------------
@@ -2980,56 +3448,37 @@ checkShaft2	ldy #39
 		
 checkShaft4	ldy #1
 checkShaft6	lda shaftPos0,y
-		beq checkShaft5
+		beq checkShaft9
 		dey
 		bpl checkShaft6
 		bmi checkShaftEx				;no free player
 		
-checkShaft5	
-;		clc
-;		lda mantaDirectionAndSpeed
-;		bpl checkShaft5a
-;		sec
-;checkShaft5a	ror
-		lda pixelsToScroll
-		lsr
-		clc
-checkShaft9	adc #204
+checkShaft9	lda #204
 		sta shaftPos0,y
-		;sta hposp2,y
-		
-		stx temp
-		txa
-		asl
+
+		lda p2Ypos,y					;get old Y-pos
+		sta checkShaft7+1
+				
+		txa						;compute new Y-pos
+		asl						;from char-position
 		asl
 		asl
 		adc #72
-		tax
+		sta checkShaft8+1
+		sta p2Ypos,y
 
-		tya
+		tya						;compute hi-byte (player-no)
 		adc #$ce
 		sta checkShaft7+2
 		sta checkShaft8+2
-		
-		lda #7
-		sta cnt
-		
-		lda p2Ypos,y
-		pha
-		txa
-		sta p2Ypos,y
-		pla
-		tay
 
+		ldy #7
 checkShaft3	lda #0						;clear old shaft and
 checkShaft7	sta $ce00,y					;draw new one	
 		lda #$ff
-checkShaft8	sta $ce00,x
-		inx
-		iny
-		dec cnt
+checkShaft8	sta $ce00,y
+		dey
 		bpl checkShaft3
-		ldx temp
 		
 checkShaft1	inc ptr+1
 		inc ptr+1
@@ -3332,46 +3781,46 @@ checkShaftEx	rts
 ;-------------------------------------------------------------------
 ; checkHitsFromHittingStuff
 ;-------------------------------------------------------------------
-addScore	sed
-		lda scoresToAddArray1,Y
-		clc
-		adc playerScore + $03
-		sta playerScore + $03
-		lda scoresToAddArray2,Y
-		adc playerScore + $02
-		sta playerScore + $02
-		php
-		lda playerScore + $01
-		adc #$00
-		sta playerScore + $01
-		lda playerScore
-		adc #$00
-		sta playerScore
-		bcc addScore1
-		lda #$99
-		sta playerScore
-		sta playerScore + $01
-		sta playerScore + $02
-		sta playerScore + $03
-		plp
-		cld
-		rts
-
-addScore1	plp
-		bcc addScore2
-		clc
-		lda currentPlayerLivesLeft
-		adc #$01
-		bcs addScore2
-		sta currentPlayerLivesLeft
-		cld
-		jsr UpdateLivesLeft
-		;lda #$81
-		;sta a91
-		rts
-
-addScore2   	cld
-		rts
+;addScore	sed
+;		lda scoresToAddArray1,Y
+;		clc
+;		adc playerScore + $03
+;		sta playerScore + $03
+;		lda scoresToAddArray2,Y
+;		adc playerScore + $02
+;		sta playerScore + $02
+;		php
+;		lda playerScore + $01
+;		adc #$00
+;		sta playerScore + $01
+;		lda playerScore
+;		adc #$00
+;		sta playerScore
+;		bcc addScore1
+;		lda #$99
+;		sta playerScore
+;		sta playerScore + $01
+;		sta playerScore + $02
+;		sta playerScore + $03
+;		plp
+;		cld
+;		rts
+;
+;addScore1	plp
+;		bcc addScore2
+;		clc
+;		lda currentPlayerLivesLeft
+;		adc #$01
+;		bcs addScore2
+;		sta currentPlayerLivesLeft
+;		cld
+;		jsr UpdateLivesLeft
+;		;lda #$81
+;		;sta a91
+;		rts
+;
+;addScore2   	cld
+;		rts
 ;------------------------------------------------------------
 ; keyboard
 ;------------------------------------------------------------
@@ -3458,21 +3907,21 @@ keyboardEx	rts
 ;------------------------------------------------------------
 ; random4bit
 ;------------------------------------------------------------
-random4bit	lda random
-		and #$0f
-		sec
-		sbc #8
-		clc
-		rts
-;------------------------------------------------------------
-; random3bit
-;------------------------------------------------------------
-random3bit	lda random
-		and #$07
-		sec
-		sbc #4
-		clc
-		rts
+;random4bit	lda random
+;		and #$0f
+;		sec
+;		sbc #8
+;		clc
+;		rts
+;;------------------------------------------------------------
+;; random3bit
+;;------------------------------------------------------------
+;random3bit	lda random
+;		and #$07
+;		sec
+;		sbc #4
+;		clc
+;		rts
 ;------------------------------------------------------------
 ; collision
 ;------------------------------------------------------------
@@ -3682,43 +4131,57 @@ random3bit	lda random
 ; renderSprites
 ;------------------------------------------------------------
 renderSprites	ldx #7
-renderSprites3	lda #EGO_CMD_DIS_SPRITE				;enable or disable sprite
-		ldy spriteEna,x
+renderSprites3	ldy #EGO_CMD_DIS_SPRITE				;enable or disable sprite
+		lda msbForSpriteArray,x
+		and vic_d015
 		beq renderSprites1
-		lda #EGO_CMD_ENA_SPRITE
-renderSprites1	sta EGO_REG_CMD
+		ldy #EGO_CMD_ENA_SPRITE
+renderSprites1	sty EGO_REG_CMD
 		stx EGO_REG_DATA
-		tya
+		tay
 		beq renderSprites2
-		
+
 		lda #EGO_CMD_SPRITE_DATA			;associate sprite with shape
 		sta EGO_REG_CMD
-		stx EGO_REG_DATA
-		lda spriteShape,x
-		sta EGO_REG_DATA
-
-		lda #EGO_CMD_SPRITE_MODE
+		stx EGO_REG_DATA				;sprite no
+		lda sprite0Ptr,x
+		sta EGO_REG_DATA				;shape no
+		
+		lda #EGO_CMD_SPRITE_MODE			;set sprite mode
 		sta EGO_REG_CMD
-		stx EGO_REG_DATA
+		stx EGO_REG_DATA				;sprite no
 		lda spriteModus,x
 		sta EGO_REG_DATA
+
+		txa
+		asl
+		tay						;Y = X * 2
 		
-		ldy #0
-		lda #EGO_CMD_SET_SPRITE_XY
+		lda #EGO_CMD_SET_SPRITE_XY			;set sprite XY-pos
 		sta EGO_REG_CMD
-		stx EGO_REG_DATA
-		lda spriteXpos,x
+		stx EGO_REG_DATA				;sprite no
+		
+		clc
+		lda msbForSpriteArray,x
+		and vic_d010					;sprite X pos msb
+		beq renderSprites4
+		sec
+renderSprites4	lda vic_d000,y					;sprite X pos
+		ror						;div by 2
 		sta EGO_REG_DATA
-		sty EGO_REG_DATA
-		lda spriteYpos,x
+		lda #0
 		sta EGO_REG_DATA
-		sty EGO_REG_DATA
+		lda vic_d001,y					;sprite Y pos
+		sta EGO_REG_DATA
+		lda #0
+		sta EGO_REG_DATA
 		
 renderSprites2	dex
 		bpl renderSprites3
 
 		lda #EGO_CMD_RENDER_SPRITES
 		sta EGO_REG_CMD
+	
 		jmp waitstatus
 
 ;------------------------------------------------------------
@@ -3796,7 +4259,6 @@ renderSprites2	dex
 ;------------------------------------------------------------
 initLevel	ldx currentLevel	
 		lda levelColorBak,x
-		lda #0
 		sta colorbk
 		lda levelColorPf0,x
 		sta colorpf0
@@ -3809,11 +4271,11 @@ initLevel	ldx currentLevel
 ;		jsr uploadSurfaceCharset
 ;		jsr drawdread
 
-		ldx #5*8-1					;initialize all sprite data
-		lda #0
-initLevel1	sta spriteEna,x
-		dex
-		bpl initLevel1
+;		ldx #5*8-1					;initialize all sprite data
+;		lda #0
+;initLevel1	sta spriteEna,x
+;		dex
+;		bpl initLevel1
 
 ;		stx hspeed					;X=$ff
 		inx
@@ -3825,7 +4287,7 @@ initLevel1	sta spriteEna,x
 		stx playerScore+2
 		stx playerScore+3	
 		stx shaftPos0
-		stx minePos1
+		stx shaftPos1
 		stx indexToCurrentLevelTextureData
 		
 		inx
@@ -3910,17 +4372,14 @@ dli0		lda #$02
 		lda #$00
 		sta colpf2
 		sta colbk
-		beq dliproc1
-
+		jmp dliproc1
 
 ;------------------------------------------------------------
 ; main game initialization
 ;------------------------------------------------------------
 initGame
 		jsr copyRomRam					;OS is not required, but the RAM underneath
-;		jsr GenerateRandomDataFromRNG
 		jsr initdlist					;initialise Atari Hardware
-;		jsr LoadSurfaceStructureData			;generate tile pointers
 		jsr setScreenLines				;upload addresses of gfx lines
 
 		ldx #0
@@ -3941,6 +4400,8 @@ filltitle:	lda #$30					;clear title screen and debug lines
 		cpx #160
 		bne filltitle
 
+		ldx #1
+		stx currentLevel
 		rts
 		
 ; =================================================================
@@ -4004,6 +4465,44 @@ GenerateRandom1	lda random					; Random Number Generator
 		inx
 		bne GenerateRandom1
 		rts
+
+
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+switchMulti	ldx #$0f
+		stx switchDlist3+1
+		dex
+		stx switchDlist4+1
+		bne switchDlist
+		
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+switchMono	ldx #$0e
+		stx switchDlist3+1
+		inx
+		stx switchDlist4+1
+		
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
+switchDlist	ldx #dlgfxtop-dl-1
+switchDlist2	lda mathpack,x
+		and #$0f
+switchDlist3	cmp #$0e
+		bne switchDlist1
+		lda mathpack,x
+		and #$f0
+switchDlist4	ora #$0f
+		sta mathpack,x
+switchDlist1	inx
+		cpx #dldebug-dl
+		bne switchDlist2
+		rts
+;------------------------------------------------------------
+;
+;------------------------------------------------------------
 
 ;------------------------------------------------------------
 ;
@@ -4157,8 +4656,8 @@ b19E3   	stx livesLeftPlayerTwoText
 WriteToScreen
 		stx dataLoPtr
 		sty dataHiPtr
-								;Get the Y Pos from the first byte
-		ldy #$00
+
+		ldy #$00					;Get the Y Pos from the first byte
 		lda (dataLoPtr),Y
 		sta currentCharYPos
 ;bB2A0   =*+$01
@@ -4309,28 +4808,27 @@ char2title	lda #EGO_CMD_CHAR_TO_VIDEO
 ;------------------------------------------------------------
 char2gfx	lda #EGO_CMD_CHAR_TO_VIDEO
 		sta EGO_REG_CMD
-		
-		clc
+
 		lda scrollPositionLoPtr
 		sta EGO_REG_DATA
 		lda scrollPositionHiPtr
 		sta EGO_REG_DATA
 
-		ldx #0
-		stx EGO_REG_DATA				;src inc
-		ldy #2
-		sty EGO_REG_DATA
+		lda srcWidthLo
+		sta EGO_REG_DATA				;src inc
+		lda srcWidthHi
+		sta EGO_REG_DATA
 		
 		lda #<gfxmem
 		sta EGO_REG_DATA
 		lda #>gfxmem
 		sta EGO_REG_DATA
-		
-		
+	
 		ldy #40
 		sty EGO_REG_DATA				;dest inc (40)
-		stx EGO_REG_DATA
-		
+		lda #0
+		sta EGO_REG_DATA
+
 		sty EGO_REG_DATA				;width
 		lda #17
 		sta EGO_REG_DATA				;height
@@ -4341,11 +4839,9 @@ char2gfx	lda #EGO_CMD_CHAR_TO_VIDEO
 		
 		lda pixelsToScroll
 		and #$7e
-		;asl
 		sta EGO_REG_DATA				;scroll
 		lda #0
 		sta EGO_REG_DATA				;col38 = false
-		;rts
 		
 waitstatus	lda EGO_REG_STATUS
 		bmi waitstatus
@@ -4589,18 +5085,25 @@ stars2gfx1	dex
 		bpl stars2gfx2
 		rts
 
+
 ;-------------------------------------------------------------------
-; GenerateStarfield
+; clear starfield
 ;-------------------------------------------------------------------
-genStars	lda #0						;clear 1280 bytes for starfield
+clearStarfield	lda #0						;clear 1280 bytes for starfield
 		tax
-genStars3	sta gfxtop,x
+clearStarfield1	sta gfxtop,x
 		sta gfxtop+$100,x
 		sta gfxtop+$200,x
 		sta gfxtop+$300,x
 		sta gfxtop+$400,x		
 		inx
-		bne genStars3
+		bne clearStarfield1
+		rts
+		
+;-------------------------------------------------------------------
+; GenerateStarfield
+;-------------------------------------------------------------------
+genStars	jsr clearStarfield
 
 		clc
 		lda #<(gfxtop+4*40+1)
@@ -4731,7 +5234,7 @@ getOption	lda #4
 		bit consol
 		bne getOption1
 
-		inc pause
+;		inc pause
 
 getOption2	bit consol
 		beq getOption2
@@ -4839,48 +5342,75 @@ OUTCH:		ldx dbgpos
 		inc dbgpos
 		rts
 
-mantaYpos	.byte mantay
-mantaXpos	.byte mantax
-mantajfy	.byte 0
-stickjiffy	.byte 8
-tileColumnCnt	.byte 0
-tileRowCnt	.byte 0
-numberOfTiles	.byte 0
-dreadcolumn	.word 0
 dlino		.byte 0
-hscrol		.byte 0
-currentLevel	.byte 1
 dbgpos		.byte 0
-turnactive	.byte 0
-turncnt		.byte 0
-pause		.byte 0
-xshadow		.byte 0
-dead		.byte 0
-nocollision	.byte 1
-hspeed		.byte 0
-p2Ypos		.byte 0
 colorp2		.byte 0
 colorp3		.byte 0
 colorpf0	.byte 0
-colorpf1	.byte 0
-colorpf2	.byte 0
 colorbk		.byte 0
+p2Ypos		.byte 0
+p3Ypos		.byte 0
 shaftPos0	.byte 0
-minePos1	.byte 0
+shaftPos1	.byte 0
 carryPos0	.byte 0
 carryPos1	.byte 0
 scrollPosLo	.byte 0
-posScrollSeg	.byte 0
 keyPressed	.byte $ff
 keyDebounce	.byte 0
-initialPlayerScore
-		.BYTE $00,$00,$00,$00,$00,$03,$01,$01
-	
-flipLeftSeq	.byte 25,24,23,22,21,20,19,18,17		;left 1-9
-		.byte 38,37,36,35,34,33,32			;flip 0-6
-		
-flipRightSeq	.byte 1,0,15,14,13,12,11,10,9
-		.byte 39,40,41,42,43,44,45
+charsetSwitcher	.byte 0
+srcWidthLo	.byte 0
+srcWidthHi	.byte 0
+
+vic_d000	.byte 0						;Sprite 0: X-Position
+vic_d001	.byte 0						;Sprite 0: Y-Position
+vic_d002	.byte 0						;Sprite 1: X-Position
+vic_d003	.byte 0						;Sprite 1: Y-Position
+vic_d004	.byte 0						;Sprite 2: X-Position
+vic_d005	.byte 0						;Sprite 2: Y-Position
+vic_d006	.byte 0						;Sprite 3: X-Position
+vic_d007	.byte 0						;Sprite 3: Y-Position
+vic_d008	.byte 0						;Sprite 4: X-Position
+vic_d009	.byte 0						;Sprite 4: Y-Position
+vic_d00a	.byte 0						;Sprite 5: X-Position
+vic_d00b	.byte 0						;Sprite 5: Y-Position
+vic_d00c	.byte 0						;Sprite 6: X-Position
+vic_d00d	.byte 0						;Sprite 6: Y-Position
+vic_d00e	.byte 0						;Sprite 7: X-Position
+vic_d00f	.byte 0						;Sprite 7: Y-Position
+
+vic_d010	.byte 0						;Sprites X-MSB
+vic_d011	.byte 0						;Controll Reg 1
+vic_d012	.byte 0						;raster line
+vic_d013	.byte 0
+vic_d014	.byte 0
+vic_d015	.byte 0						;Sprites Enable
+vic_d016	.byte 0						;Controll Reg 2
+vic_d017	.byte 0						;Sprites scale Y
+vic_d018	.byte 0						;Memory control
+vic_d019	.byte 0						;Int Status
+vic_d01a	.byte 0						;Int Mask
+vic_d01b	.byte 0						;Sprites Priority
+vic_d01c	.byte 0						;Sprites hires(0) or multicolor(1)
+vic_d01d	.byte 0						;Sprites scale X
+vic_d01e	.byte 0
+vic_d01f	.byte 0
+
+vic_d020	.byte 0
+vic_d021	.byte 0
+vic_d022	.byte 0
+vic_d023	.byte 0
+vic_d024	.byte 0
+vic_d025	.byte 0						;Sprites Multicolor_0
+vic_d026	.byte 0						;Sprites Multicolor_1
+vic_d027	.byte 0						;Sprite 0 color
+vic_d028	.byte 0						;Sprite 1 color
+vic_d029	.byte 0						;Sprite 2 color
+vic_d02a	.byte 0						;Sprite 3 color
+vic_d02b	.byte 0						;Sprite 4 color
+vic_d02c	.byte 0						;Sprite 5 color
+vic_d02d	.byte 0						;Sprite 6 color
+vic_d02e	.byte 0						;Sprite 7 color
+vic_d02f	.byte 0
 
 ; The score are decimal so: 10,24,50,100 etc.
 scoresToAddArray2
@@ -4890,16 +5420,8 @@ scoresToAddArray1
 		.byte $00,$10,$25,$50,$00,$50,$50,$00
 		.byte $50,$00,$00,$00
 
-spriteEna	.byte 0, 0, 0, 0, 0, 0, 0, $ff
-spriteXpos	.byte 0, 0, 0, 0, 0, 0, 0, 0
-spriteYpos	.byte 0, 0, 0, 0, 0, 0, 0, 0
-spriteShape	.byte 0, 0, 0, 0, 0, 0, 0, 0
-spriteModus	.byte 0, 0, 0, 0, 0, 0, 0, 0
-bulletSlot	.byte 0, 0, 0, 0, 0, 0
-bulletCharY	.byte 0, 0, 0, 0, 0, 0
-bulletPosLo	.byte 0, 0, 0, 0, 0, 0
-bulletPosHi	.byte 0, 0, 0, 0, 0, 0
-bulletOldChar	.byte 0, 0, 0, 0, 0, 0
+sprite0Ptr	.byte 0, 0, 0, 0, 0, 0, 0, 0
+spriteModus	.byte 1, 1, 1, 1, 1, 1, 1, 2
 
 charData	.byte 0, 0, 0, 0, 0, 0, 0, 0
 
@@ -4933,18 +5455,10 @@ playerBulletSlotArray
 :16		.byte 0
 bulletOffsetsInCharsetDef
 :16		.byte 0
-offsetsForPlayerBullet
-		.byte $00,$08,$10,$18,$20,$28,$30,$38
-		.byte $40,$48,$50,$58,$60,$68,$70,$78
-
-hitPtrLo	.byte $00,$01,$00,$01,$00,$01,$02,$00
-		.byte $01,$02,$00,$01,$02,$00,$00,$00
-hitPtrHi	.byte $00,$00,$02,$02,$00,$00,$00,$02
-		.byte $02,$02,$04,$04,$04,$00,$00,$00
-hitYlen		.byte $01,$01,$01,$01,$02,$02,$02,$02
-		.byte $02,$02,$02,$02,$02,$00,$00,$00
-hitScore	.byte $02,$02,$02,$02,$02,$00,$00,$00
-		.byte $02,$02,$02,$02,$04,$04,$04,$04
+BackedUpPlayerOneScore
+:16		.byte 0
+BackedUpPlayerTwoScore
+:16		.byte 0
 
 starPosLo
 :17		.byte 0
@@ -4967,31 +5481,20 @@ lineAdrHi	.byte >(gfxmem+4*40+00*320), >(gfxmem+4*40+01*320), >(gfxmem+4*40+02*3
 firstlineLo	.byte >(gfxmem+4*40+16*320)
 		
 titleLineLo	.byte <(titlechars+0*40),<(titlechars+1*40),<(titlechars+2*40),<(titlechars+3*40)
-		.byte <(dreadnaught+00*512),<(dreadnaught+01*512),<(dreadnaught+02*512),<(dreadnaught+03*512)
-		.byte <(dreadnaught+04*512),<(dreadnaught+05*512),<(dreadnaught+06*512),<(dreadnaught+07*512)
-		.byte <(dreadnaught+08*512),<(dreadnaught+09*512),<(dreadnaught+10*512),<(dreadnaught+11*512)
-		.byte <(dreadnaught+12*512),<(dreadnaught+13*512),<(dreadnaught+14*512),<(dreadnaught+15*512)
-firstlineHi	.byte <(dreadnaught+16*512)
+		.byte <(dreadnaught+00*40),<(dreadnaught+00*40)
+		.byte <(dreadnaught+00*40),<(dreadnaught+01*40),<(dreadnaught+02*40),<(dreadnaught+03*40)
+		.byte <(dreadnaught+04*40),<(dreadnaught+05*40),<(dreadnaught+06*40),<(dreadnaught+07*40)
+		.byte <(dreadnaught+08*40),<(dreadnaught+09*40),<(dreadnaught+10*40),<(dreadnaught+11*40)
+		.byte <(dreadnaught+12*40),<(dreadnaught+13*40),<(dreadnaught+14*40),<(dreadnaught+15*40)
+firstlineHi	.byte <(dreadnaught+16*40)
 		
 titleLineHi	.byte >(titlechars+0*40),>(titlechars+1*40),>(titlechars+2*40),>(titlechars+3*40)
-		.byte >(dreadnaught+00*512),>(dreadnaught+01*512),>(dreadnaught+02*512),>(dreadnaught+03*512)
-		.byte >(dreadnaught+04*512),>(dreadnaught+05*512),>(dreadnaught+06*512),>(dreadnaught+07*512)
-		.byte >(dreadnaught+08*512),>(dreadnaught+09*512),>(dreadnaught+10*512),>(dreadnaught+11*512)
-		.byte >(dreadnaught+12*512),>(dreadnaught+13*512),>(dreadnaught+14*512),>(dreadnaught+15*512)
-		.byte >(dreadnaught+16*512)
-;lineOffsetLo
-;		.byte <(-04*40), <(-03*40), <(-02*40), <(-01*40), <(00*40), <(01*40), <(02*40), <(03*40)
-;lineOffsetHi
-;		.byte >(-04*40), >(-03*40), >(-02*40), >(-01*40), >(00*40), >(01*40), >(02*40), >(03*40)
-	
-
-
-;		;icl "EgoUridium-Manta.asm"	
-;		;icl "explosion_sprites.asm"
-		;
-titleCharset	;ins "main-charset.bin"
-surfaceCharset	;ins "surface-common-charset.bin"
-		;icl "surface-charset.asm"
+		.byte >(dreadnaught+00*40),>(dreadnaught+00*40)
+		.byte >(dreadnaught+00*40),>(dreadnaught+01*40),>(dreadnaught+02*40),>(dreadnaught+03*40)
+		.byte >(dreadnaught+04*40),>(dreadnaught+05*40),>(dreadnaught+06*40),>(dreadnaught+07*40)
+		.byte >(dreadnaught+08*40),>(dreadnaught+09*40),>(dreadnaught+10*40),>(dreadnaught+11*40)
+		.byte >(dreadnaught+12*40),>(dreadnaught+13*40),>(dreadnaught+14*40),>(dreadnaught+15*40)
+		.byte >(dreadnaught+16*40)
 		
 		icl "EgoUridium-GameData.asm"
 		icl "EgoUridium-LevelData.asm"
@@ -5006,7 +5509,7 @@ dl		.byte $70,$70
 :7		.byte $0f
 		.byte $0f+$80
 
-		.byte $40+dc
+dlgfxtop	.byte $40+dc
 		.word gfxtop
 :15		.byte dc
 
@@ -5019,11 +5522,10 @@ dl		.byte $70,$70
 
 		.byte $40+dc
 		.word gfxbottom
-:14		.byte dc
-		
+:14		.byte dc		
 		.byte dc+$80
 		
-		.byte $40+$02
+dldebug		.byte $40+$02
 text:		.word debugScreen
 		.byte 2
 		.byte $41
@@ -5031,48 +5533,6 @@ text:		.word debugScreen
 
 gfxtop		= $da00
 gfxbottom	= gfxtop + $280
-
-;		org $349F
-;f349F   .BYTE $4E,$1B,$12,$0D,$12,$1E,$42,$30
-;        .BYTE $0B,$22,$30,$3A,$17,$0D,$1B,$0E
-;        .BYTE $54,$30,$3B,$1B,$0A,$22,$0B,$1B
-;        .BYTE $18,$18,$14,$28,$30,$41,$12,$10
-;        .BYTE $11,$30,$2E
-;
-;;hiScoreForScrollingBanner
-;        .BYTE " 12000 AEB", $FF, $FF, $FF, $FF
-;;player1Symbol
-;        .BYTE $00,$0F
-;        .BYTE "  ", $55, $55, " ", $56, "  ", $FF
-;;player2Symbol
-;        .BYTE $00,$0F
-;        .BYTE " ", $55, $55, " ", $56, $56, " ", $FF
-;;playerAndJoystickSymbol
-;        .BYTE $00,$0F
-;        .BYTE "   ", $55, " ", $56, "   ", $FF
-;;arrowKeysSymbol
-;        .BYTE $02,$0A,$57,$FF
-;;globeSymbol
-;        .BYTE $02,$0A,$58,$FF
-;;uridiumDecal
-;        .BYTE $02,$0A
-;        .BYTE $30,$30,$30,$30,$30,$31,$32,$33
-;        .BYTE $34,$35,$36,$37,$38,$39,$7D,$30
-;        .BYTE $30,$30,$30,$30,$FF
-;;hiScoreLabel
-;        .BYTE $02,$0A
-;        .BYTE "     Hi-score      ", $FF
-;
-;;inGameHiScoreDisplay =*+$04
-;;inGameBanner ; $3526
-;        .BYTE $02,$0A
-;        .BYTE "     12000 AEB   ", $FF, "2c    "
-;        .BYTE " ", $55, $55, "     ", $56, $56, $FF, "2c     ", $55, " "
-;        .BYTE "        ", $56, $FF, "2c     ", $55, $55, " "
-;        .BYTE "      ", $56, $FF
-;;scrollingTitleScreenDataLoPtrArray   .BYTE $3A,$4B,$5E
-;;scrollingTitleScreenDataHiPtrArray   .BYTE $35,$35,$35
-
 
 		.endp
 
